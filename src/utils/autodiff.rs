@@ -4,10 +4,10 @@
 //! using automatic differentiation with Rust's nightly `std::autodiff` feature.
 //! When autodiff is not available, it falls back to numerical differentiation.
 
-use ndarray::{Array1, Array2};
 use crate::error::{LmOptError, Result};
 use crate::problem::Problem;
 use crate::utils::finite_difference;
+use ndarray::{Array1, Array2};
 
 // Flag to track if autodiff is available
 // This is determined at compile time based on the nightly feature
@@ -38,7 +38,7 @@ pub fn jacobian<P: Problem>(problem: &P, params: &Array1<f64>) -> Result<Array2<
     if problem.has_custom_jacobian() {
         return problem.jacobian(params);
     }
-    
+
     // Otherwise use finite differences (autodiff will be implemented later)
     finite_difference::jacobian(problem, params, None)
 }
@@ -64,7 +64,7 @@ pub fn jacobian<P: Problem>(problem: &P, params: &Array1<f64>) -> Result<Array2<
 /// finite differences.
 pub fn gradient<F>(f: F, params: &Array1<f64>) -> Result<Array1<f64>>
 where
-    F: Fn(&Array1<f64>) -> Result<f64>
+    F: Fn(&Array1<f64>) -> Result<f64>,
 {
     // Use finite differences (autodiff will be implemented later)
     finite_difference::gradient(f, params, None)
@@ -91,7 +91,7 @@ where
 /// finite differences.
 pub fn hessian<F>(f: F, params: &Array1<f64>) -> Result<Array2<f64>>
 where
-    F: Fn(&Array1<f64>) -> Result<f64>
+    F: Fn(&Array1<f64>) -> Result<f64>,
 {
     // Use finite differences (autodiff will be implemented later)
     finite_difference::hessian(f, params, None)
@@ -102,7 +102,7 @@ where
 mod autodiff_impl {
     use super::*;
     use std::autodiff::Forward;
-    
+
     // Implementations using std::autodiff will go here
     // This is a placeholder for future implementation
 }

@@ -25,7 +25,15 @@
       "Bash(cargo doc:*)",
       "Bash(grep:*)",
       "Bash(git rm:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(mv:*)",
+      "Bash(RUST_BACKTRACE=1 cargo test --lib uncertainty::confidence::tests::test_confidence_intervals -- --nocapture)",
+      "Bash(cargo run:*)",
+      "Bash(cargo bench:*)",
+      "Bash(sed:*)",
+      "Bash(cp:*)",
+      "Bash(python3:*)",
+      "Bash(rustc:*)"
     ],
     "deny": []
   }

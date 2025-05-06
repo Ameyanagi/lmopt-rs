@@ -196,7 +196,7 @@ fn bench_linear_model_1000(b: &mut Bencher) {
     let lm = LevenbergMarquardt::new(config);
     
     b.iter(|| {
-        test::black_box(lm.minimize(&model, &initial_params))
+        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
     });
 }
 
@@ -214,7 +214,7 @@ fn bench_exponential_model_1000(b: &mut Bencher) {
     let lm = LevenbergMarquardt::new(config);
     
     b.iter(|| {
-        test::black_box(lm.minimize(&model, &initial_params))
+        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
     });
 }
 
@@ -232,7 +232,7 @@ fn bench_rosenbrock(b: &mut Bencher) {
     let lm = LevenbergMarquardt::new(config);
     
     b.iter(|| {
-        test::black_box(lm.minimize(&model, &initial_params))
+        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
     });
 }
 
@@ -246,7 +246,7 @@ fn bench_linear_model_10(b: &mut Bencher) {
     let lm = LevenbergMarquardt::new(config);
     
     b.iter(|| {
-        test::black_box(lm.minimize(&model, &initial_params))
+        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
     });
 }
 
@@ -259,7 +259,7 @@ fn bench_linear_model_100(b: &mut Bencher) {
     let lm = LevenbergMarquardt::new(config);
     
     b.iter(|| {
-        test::black_box(lm.minimize(&model, &initial_params))
+        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
     });
 }
 
@@ -272,6 +272,6 @@ fn bench_linear_model_10000(b: &mut Bencher) {
     let lm = LevenbergMarquardt::new(config);
     
     b.iter(|| {
-        test::black_box(lm.minimize(&model, &initial_params))
+        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
     });
 }

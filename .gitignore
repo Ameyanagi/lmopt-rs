@@ -58,3 +58,4 @@ var/
 # Exclude benchmark data that shouldn't be in the repo
 /bench_results/
 /perf_data/
+**/.claude/settings.local.json

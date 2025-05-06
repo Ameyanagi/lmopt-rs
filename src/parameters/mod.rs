@@ -12,18 +12,18 @@
 //! - `Bounds` and `BoundsTransform`: Handling of bounds constraints
 
 pub mod bounds;
+pub mod constraints;
+pub mod expression;
 pub mod parameter;
 pub mod parameters;
-pub mod expression;
-pub mod constraints;
 
 // Include tests
 #[cfg(test)]
 mod tests;
 
 // Re-export key types
-pub use bounds::{Bounds, BoundsTransform, BoundsError};
+pub use bounds::{Bounds, BoundsError, BoundsTransform};
+pub use constraints::{Constraint, ConstraintError, ConstraintType, Constraints};
+pub use expression::{EvaluationContext, Expression, ExpressionError, SimpleContext};
 pub use parameter::{Parameter, ParameterError};
 pub use parameters::{Parameters, SerializationError};
-pub use expression::{Expression, ExpressionError, EvaluationContext, SimpleContext};
-pub use constraints::{Constraint, ConstraintType, Constraints, ConstraintError};

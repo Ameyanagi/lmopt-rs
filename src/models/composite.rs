@@ -5,12 +5,12 @@
 //! simpler building blocks.
 
 use ndarray::{Array1, Array2};
-use std::sync::{Arc, RwLock};
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 use crate::error::{LmOptError, Result};
-use crate::parameters::{Parameters, Parameter};
-use crate::model::{Model, BaseModel};
+use crate::model::{BaseModel, Model};
+use crate::parameters::{Parameter, Parameters};
 
 /// A composite model that combines two models with an operation
 ///
@@ -61,7 +61,7 @@ impl CompositeModel {
     {
         // Create a combined parameter set
         let mut parameters = Parameters::new();
-        
+
         // Add parameters from the left model
         let left_params = left.parameters();
         for (name, param) in left_params.iter() {
@@ -78,7 +78,7 @@ impl CompositeModel {
             } else {
                 name.clone()
             };
-            
+
             // Add the parameter to the combined set
             let mut new_param = param.clone();
             if mapped_name != *name {
@@ -86,21 +86,21 @@ impl CompositeModel {
                 if let Some(expr) = new_param.expr() {
                     // Start with a fresh string we can modify
                     let mut updated_expr = expr.to_string();
-                    
+
                     // Iterate through the prefix map and apply replacements
                     for (prefix_old, prefix_new) in prefix_map.as_ref().unwrap().iter() {
                         // Replace parameter references in expressions
                         updated_expr = updated_expr.replace(prefix_old, prefix_new.as_str());
                     }
-                    
+
                     // Set the updated expression back to the parameter
                     new_param.set_expr(Some(&updated_expr))?;
                 }
             }
-            
+
             parameters.add_param_with_param(&mapped_name, new_param)?;
         }
-        
+
         // Add parameters from the right model
         let right_params = right.parameters();
         for (name, param) in right_params.iter() {
@@ -117,14 +117,14 @@ impl CompositeModel {
             } else {
                 name.clone()
             };
-            
+
             // Check if the parameter already exists (from the left model)
             if parameters.get(&mapped_name).is_some() {
                 // Parameter already exists, this is a shared parameter
                 // We don't add it again, but we should check that the constraints are compatible
                 continue;
             }
-            
+
             // Add the parameter to the combined set
             let mut new_param = param.clone();
             if mapped_name != *name {
@@ -132,21 +132,21 @@ impl CompositeModel {
                 if let Some(expr) = new_param.expr() {
                     // Start with a fresh string we can modify
                     let mut updated_expr = expr.to_string();
-                    
+
                     // Iterate through the prefix map and apply replacements
                     for (prefix_old, prefix_new) in prefix_map.as_ref().unwrap().iter() {
                         // Replace parameter references in expressions
                         updated_expr = updated_expr.replace(prefix_old, prefix_new.as_str());
                     }
-                    
+
                     // Set the updated expression back to the parameter
                     new_param.set_expr(Some(&updated_expr))?;
                 }
             }
-            
+
             parameters.add_param_with_param(&mapped_name, new_param)?;
         }
-        
+
         // Create the composite model
         Ok(Self {
             left: Arc::new(RwLock::new(left)),
@@ -155,31 +155,33 @@ impl CompositeModel {
             parameters,
         })
     }
-    
+
     /// Get a reference to the left model
     pub fn left(&self) -> Result<&RwLock<dyn Model + Send + Sync>> {
         Ok(&self.left)
     }
-    
+
     /// Get a reference to the right model
     pub fn right(&self) -> Result<&RwLock<dyn Model + Send + Sync>> {
         Ok(&self.right)
     }
-    
+
     /// Get the operation used to combine the models
     pub fn operation(&self) -> Operation {
         self.operation
     }
-    
+
     /// Update parameters in the component models
     fn update_component_parameters(&self) -> Result<()> {
         // Look for parameters that need updating in the left model
         let mut left_params_to_update = Vec::new();
         {
-            let left_lock = self.left.read().map_err(|_| LmOptError::ComputationError(
-                "Failed to acquire read lock on left model".to_string()
-            ))?;
-            
+            let left_lock = self.left.read().map_err(|_| {
+                LmOptError::ComputationError(
+                    "Failed to acquire read lock on left model".to_string(),
+                )
+            })?;
+
             let left_params = left_lock.parameters();
             for (name, param) in left_params.iter() {
                 // Find the corresponding parameter in the composite model
@@ -192,7 +194,7 @@ impl CompositeModel {
                     }
                     None
                 });
-                
+
                 if let Some(composite_param) = composite_param {
                     if param.value() != composite_param.value() {
                         // Parameter value has changed in the composite model
@@ -201,28 +203,32 @@ impl CompositeModel {
                 }
             }
         }
-        
+
         // Update the parameters if needed
         if !left_params_to_update.is_empty() {
             // Get write lock and update parameters
-            let mut left_lock = self.left.write().map_err(|_| LmOptError::ComputationError(
-                "Failed to acquire write lock on left model".to_string()
-            ))?;
-            
+            let mut left_lock = self.left.write().map_err(|_| {
+                LmOptError::ComputationError(
+                    "Failed to acquire write lock on left model".to_string(),
+                )
+            })?;
+
             for (name, value) in left_params_to_update {
                 if let Some(left_param) = left_lock.parameters_mut().get_mut(&name) {
                     left_param.set_value(value)?;
                 }
             }
         }
-        
+
         // Look for parameters that need updating in the right model
         let mut right_params_to_update = Vec::new();
         {
-            let right_lock = self.right.read().map_err(|_| LmOptError::ComputationError(
-                "Failed to acquire read lock on right model".to_string()
-            ))?;
-            
+            let right_lock = self.right.read().map_err(|_| {
+                LmOptError::ComputationError(
+                    "Failed to acquire read lock on right model".to_string(),
+                )
+            })?;
+
             let right_params = right_lock.parameters();
             for (name, param) in right_params.iter() {
                 // Find the corresponding parameter in the composite model
@@ -235,7 +241,7 @@ impl CompositeModel {
                     }
                     None
                 });
-                
+
                 if let Some(composite_param) = composite_param {
                     if param.value() != composite_param.value() {
                         // Parameter value has changed in the composite model
@@ -244,21 +250,23 @@ impl CompositeModel {
                 }
             }
         }
-        
+
         // Update the parameters if needed
         if !right_params_to_update.is_empty() {
             // Get write lock and update parameters
-            let mut right_lock = self.right.write().map_err(|_| LmOptError::ComputationError(
-                "Failed to acquire write lock on right model".to_string()
-            ))?;
-            
+            let mut right_lock = self.right.write().map_err(|_| {
+                LmOptError::ComputationError(
+                    "Failed to acquire write lock on right model".to_string(),
+                )
+            })?;
+
             for (name, value) in right_params_to_update {
                 if let Some(right_param) = right_lock.parameters_mut().get_mut(&name) {
                     right_param.set_value(value)?;
                 }
             }
         }
-        
+
         Ok(())
     }
 }
@@ -267,27 +275,27 @@ impl Model for CompositeModel {
     fn parameters(&self) -> &Parameters {
         &self.parameters
     }
-    
+
     fn parameters_mut(&mut self) -> &mut Parameters {
         &mut self.parameters
     }
-    
+
     fn eval(&self, x: &Array1<f64>) -> Result<Array1<f64>> {
         // Make sure component models have up-to-date parameters
         self.update_component_parameters()?;
-        
+
         // Evaluate the models
-        let left_lock = self.left.read().map_err(|_| LmOptError::ComputationError(
-            "Failed to acquire read lock on left model".to_string()
-        ))?;
-        
-        let right_lock = self.right.read().map_err(|_| LmOptError::ComputationError(
-            "Failed to acquire read lock on right model".to_string()
-        ))?;
-        
+        let left_lock = self.left.read().map_err(|_| {
+            LmOptError::ComputationError("Failed to acquire read lock on left model".to_string())
+        })?;
+
+        let right_lock = self.right.read().map_err(|_| {
+            LmOptError::ComputationError("Failed to acquire read lock on right model".to_string())
+        })?;
+
         let left_result = left_lock.eval(x)?;
         let right_result = right_lock.eval(x)?;
-        
+
         // Combine the results according to the operation
         let result = match self.operation {
             Operation::Add => &left_result + &right_result,
@@ -295,28 +303,28 @@ impl Model for CompositeModel {
             Operation::Left => left_result.clone(),
             Operation::Right => right_result.clone(),
         };
-        
+
         Ok(result)
     }
-    
-    fn jacobian(&self, x: &Array1<f64>) -> Result<Array2<f64>> {
+
+    fn jacobian(&self, _x: &Array1<f64>) -> Result<Array2<f64>> {
         // For composite models, numerical differentiation is generally more robust
         // than trying to combine analytical Jacobians, especially with parameter
         // sharing between models.
         Err(LmOptError::NotImplemented(
-            "Analytical Jacobian not implemented for CompositeModel".to_string()
+            "Analytical Jacobian not implemented for CompositeModel".to_string(),
         ))
     }
-    
+
     fn has_custom_jacobian(&self) -> bool {
         false
     }
-    
-    fn guess_parameters(&mut self, x: &Array1<f64>, y: &Array1<f64>) -> Result<()> {
+
+    fn guess_parameters(&mut self, _x: &Array1<f64>, _y: &Array1<f64>) -> Result<()> {
         // For composite models, parameter guessing is challenging
         // One approach is to try to guess the parameters of each component
         // separately, but this may not work well for all cases.
-        
+
         // For now, we just invoke the default behavior
         Ok(())
     }
@@ -345,20 +353,29 @@ where
     R: Model + Send + Sync + 'static,
 {
     let mut prefix_map = HashMap::new();
-    
+
     if let Some(left_prefix) = left_prefix {
         for name in left.parameter_names() {
             prefix_map.insert(name.clone(), format!("{}{}", left_prefix, name));
         }
     }
-    
+
     if let Some(right_prefix) = right_prefix {
         for name in right.parameter_names() {
             prefix_map.insert(name.clone(), format!("{}{}", right_prefix, name));
         }
     }
-    
-    CompositeModel::new(left, right, Operation::Add, if prefix_map.is_empty() { None } else { Some(prefix_map) })
+
+    CompositeModel::new(
+        left,
+        right,
+        Operation::Add,
+        if prefix_map.is_empty() {
+            None
+        } else {
+            Some(prefix_map)
+        },
+    )
 }
 
 /// Create a new model that is the product of two models
@@ -384,20 +401,29 @@ where
     R: Model + Send + Sync + 'static,
 {
     let mut prefix_map = HashMap::new();
-    
+
     if let Some(left_prefix) = left_prefix {
         for name in left.parameter_names() {
             prefix_map.insert(name.clone(), format!("{}{}", left_prefix, name));
         }
     }
-    
+
     if let Some(right_prefix) = right_prefix {
         for name in right.parameter_names() {
             prefix_map.insert(name.clone(), format!("{}{}", right_prefix, name));
         }
     }
-    
-    CompositeModel::new(left, right, Operation::Multiply, if prefix_map.is_empty() { None } else { Some(prefix_map) })
+
+    CompositeModel::new(
+        left,
+        right,
+        Operation::Multiply,
+        if prefix_map.is_empty() {
+            None
+        } else {
+            Some(prefix_map)
+        },
+    )
 }
 
 /// Create a composite model with shared parameters
@@ -424,15 +450,15 @@ where
 {
     // Create prefix map that ensures shared parameters get the same name
     let mut prefix_map = HashMap::new();
-    
+
     // First, generate unique prefixes for all parameters
     let left_prefix = "left_";
     let right_prefix = "right_";
-    
+
     for name in left.parameter_names() {
         prefix_map.insert(name.clone(), format!("{}{}", left_prefix, name));
     }
-    
+
     for name in right.parameter_names() {
         // Check if this parameter is shared
         let mut is_shared = false;
@@ -442,20 +468,20 @@ where
                 break;
             }
         }
-        
+
         if !is_shared {
             // Not shared, give it a unique prefix
             prefix_map.insert(name.clone(), format!("{}{}", right_prefix, name));
         }
     }
-    
+
     // Now override the prefix map for shared parameters
     for (left_name, right_name) in shared_params {
         // Use the left parameter name for both
         let shared_name = format!("{}{}", left_prefix, left_name);
         prefix_map.insert(right_name, shared_name);
     }
-    
+
     CompositeModel::new(left, right, operation, Some(prefix_map))
 }
 
@@ -464,51 +490,61 @@ mod tests {
     use super::*;
     // GaussianModel is not yet implemented
     use crate::models::LinearModel;
-    use ndarray::array;
     use approx::assert_relative_eq;
-    
+    use ndarray::array;
+
     // All tests are temporarily disabled because GaussianModel is not yet implemented
     /* Comment out all tests that use GaussianModel */
-    
+
     #[test]
     fn test_simple_linear_model() {
         // A simple test with just a LinearModel
         let mut linear = LinearModel::new("l_", true);
-        
+
         // Set parameters
-        linear.parameters_mut().get_mut("l_c0").unwrap().set_value(1.0).unwrap();
-        linear.parameters_mut().get_mut("l_c1").unwrap().set_value(0.5).unwrap();
-        
+        linear
+            .parameters_mut()
+            .get_mut("l_c0")
+            .unwrap()
+            .set_value(1.0)
+            .unwrap();
+        linear
+            .parameters_mut()
+            .get_mut("l_c1")
+            .unwrap()
+            .set_value(0.5)
+            .unwrap();
+
         // Test evaluation
         let x = array![-2.0, -1.0, 0.0, 1.0, 2.0];
         let y = linear.eval(&x).unwrap();
-        
+
         // Expected: 1.0 + 0.5 * x
         let expected = vec![0.0, 0.5, 1.0, 1.5, 2.0];
-        
+
         assert_eq!(y.len(), 5);
         for i in 0..y.len() {
             assert_relative_eq!(y[i], expected[i], epsilon = 1e-10);
         }
     }
-    /* 
+    /*
     #[test]
     fn test_composite_add() {
         // Create two simple models
         let gaussian = GaussianModel::new("g_", true);
         let linear = LinearModel::new("l_", true);
-        
+
         // Set parameters
         let mut gaussian_params = gaussian.parameters().clone();
         gaussian_params.get_mut("g_amplitude").unwrap().set_value(2.0).unwrap();
         gaussian_params.get_mut("g_center").unwrap().set_value(0.0).unwrap();
         gaussian_params.get_mut("g_sigma").unwrap().set_value(1.0).unwrap();
         gaussian_params.get_mut("g_baseline").unwrap().set_value(0.0).unwrap();
-        
+
         let mut linear_params = linear.parameters().clone();
         linear_params.get_mut("l_c0").unwrap().set_value(1.0).unwrap();
         linear_params.get_mut("l_c1").unwrap().set_value(0.5).unwrap();
-        
+
         let gaussian_with_params = BaseModel::new(
             gaussian_params,
             move |params, x| {
@@ -516,39 +552,39 @@ mod tests {
                 let center = params.get("g_center").unwrap().value();
                 let sigma = params.get("g_sigma").unwrap().value();
                 let baseline = params.get("g_baseline").unwrap().value();
-                
+
                 let result = x.iter()
                     .map(|&x_val| {
                         let arg = (x_val - center) / sigma;
                         amplitude * f64::exp(-0.5 * arg * arg) + baseline
                     })
                     .collect::<Vec<f64>>();
-                
+
                 Ok(Array1::from_vec(result))
             }
         );
-        
+
         let linear_with_params = BaseModel::new(
             linear_params,
             move |params, x| {
                 let c0 = params.get("l_c0").unwrap().value();
                 let c1 = params.get("l_c1").unwrap().value();
-                
+
                 let result = x.iter()
                     .map(|&x_val| c0 + c1 * x_val)
                     .collect::<Vec<f64>>();
-                
+
                 Ok(Array1::from_vec(result))
             }
         );
-        
+
         // Create a composite model: gaussian + linear
         let composite = add(gaussian_with_params, linear_with_params, None, None).unwrap();
-        
+
         // Test evaluation
         let x = array![-2.0, -1.0, 0.0, 1.0, 2.0];
         let y = composite.eval(&x).unwrap();
-        
+
         // Expected: gaussian(x) + linear(x)
         // gaussian: 2.0 * exp(-0.5 * x^2)
         // linear: 1.0 + 0.5 * x
@@ -559,51 +595,51 @@ mod tests {
             2.0 * f64::exp(-0.5 * 1.0) + (1.0 + 0.5),  // x = 1
             2.0 * f64::exp(-0.5 * 4.0) + (1.0 + 1.0),  // x = 2
         ];
-        
+
         assert_eq!(y.len(), 5);
         for i in 0..y.len() {
             assert_relative_eq!(y[i], expected[i], epsilon = 1e-10);
         }
     }
-    
+
     #[test]
     fn test_simple_linear_model() {
         // A simple test with just a LinearModel
         let linear = LinearModel::new("l_", true);
-        
+
         // Set parameters
         let mut linear_params = linear.parameters().clone();
         linear_params.get_mut("l_c0").unwrap().set_value(1.0).unwrap();
         linear_params.get_mut("l_c1").unwrap().set_value(0.5).unwrap();
-        
+
         let linear_model = BaseModel::new(
             linear_params,
             move |params, x| {
                 let c0 = params.get("l_c0").unwrap().value();
                 let c1 = params.get("l_c1").unwrap().value();
-                
+
                 let result = x.iter()
                     .map(|&x_val| c0 + c1 * x_val)
                     .collect::<Vec<f64>>();
-                
+
                 Ok(Array1::from_vec(result))
             }
         );
-        
+
         // Test evaluation
         let x = array![-2.0, -1.0, 0.0, 1.0, 2.0];
         let y = linear_model.eval(&x).unwrap();
-        
+
         // Expected: 1.0 + 0.5 * x
         let expected = vec![0.0, 0.5, 1.0, 1.5, 2.0];
-        
+
         assert_eq!(y.len(), 5);
         for i in 0..y.len() {
             assert_relative_eq!(y[i], expected[i], epsilon = 1e-10);
         }
     }
-    
-    /* 
+
+    /*
     Other tests commented out until GaussianModel is implemented:
     */
     #[test]
@@ -611,18 +647,18 @@ mod tests {
         // Create two simple models
         let gaussian = GaussianModel::new("g_", true);
         let linear = LinearModel::new("l_", true);
-    //         
+    //
     //         // Set parameters
     //         let mut gaussian_params = gaussian.parameters().clone();
     //         gaussian_params.get_mut("g_amplitude").unwrap().set_value(2.0).unwrap();
     //         gaussian_params.get_mut("g_center").unwrap().set_value(0.0).unwrap();
     //         gaussian_params.get_mut("g_sigma").unwrap().set_value(1.0).unwrap();
     //         gaussian_params.get_mut("g_baseline").unwrap().set_value(0.0).unwrap();
-    //         
+    //
     //         let mut linear_params = linear.parameters().clone();
     //         linear_params.get_mut("l_c0").unwrap().set_value(1.0).unwrap();
     //         linear_params.get_mut("l_c1").unwrap().set_value(0.5).unwrap();
-    //         
+    //
     //         let gaussian_with_params = BaseModel::new(
     //             gaussian_params,
     //             move |params, x| {
@@ -630,39 +666,39 @@ mod tests {
     //                 let center = params.get("g_center").unwrap().value();
     //                 let sigma = params.get("g_sigma").unwrap().value();
     //                 let baseline = params.get("g_baseline").unwrap().value();
-    //                 
+    //
     //                 let result = x.iter()
     //                     .map(|&x_val| {
     //                         let arg = (x_val - center) / sigma;
     //                         amplitude * (-0.5 * arg * arg).exp() + baseline
     //                     })
     //                     .collect::<Vec<f64>>();
-    //                 
+    //
     //                 Ok(Array1::from_vec(result))
     //             }
     //         );
-    //         
+    //
     //         let linear_with_params = BaseModel::new(
     //             linear_params,
     //             move |params, x| {
     //                 let c0 = params.get("l_c0").unwrap().value();
     //                 let c1 = params.get("l_c1").unwrap().value();
-    //                 
+    //
     //                 let result = x.iter()
     //                     .map(|&x_val| c0 + c1 * x_val)
     //                     .collect::<Vec<f64>>();
-    //                 
+    //
     //                 Ok(Array1::from_vec(result))
     //             }
     //         );
-    //         
+    //
     //         // Create a composite model: gaussian * linear
     //         let composite = multiply(gaussian_with_params, linear_with_params, None, None).unwrap();
-    //         
+    //
     //         // Test evaluation
     //         let x = array![-2.0, -1.0, 0.0, 1.0, 2.0];
     //         let y = composite.eval(&x).unwrap();
-    //         
+    //
     //         // Expected: gaussian(x) * linear(x)
     //         // gaussian: 2.0 * exp(-0.5 * x^2)
     //         // linear: 1.0 + 0.5 * x
@@ -673,13 +709,13 @@ mod tests {
     //             (2.0 * f64::exp(-0.5 * 1.0)) * (1.0 + 0.5),  // x = 1
     //             (2.0 * f64::exp(-0.5 * 4.0)) * (1.0 + 1.0),  // x = 2
     //         ];
-    //         
+    //
     //         assert_eq!(y.len(), 5);
     //         for i in 0..y.len() {
     //             assert_relative_eq!(y[i], expected[i], epsilon = 1e-10);
     //         }
     //     }
-    
+
     #[test]
     //     fn test_shared_parameters() {
     //         // Create parameters for the Gaussian models
@@ -688,13 +724,13 @@ mod tests {
     //         params1.add_param("center", 0.0).unwrap();
     //         params1.add_param("sigma", 1.0).unwrap();
     //         params1.add_param("baseline", 0.0).unwrap();
-    //         
+    //
     //         let mut params2 = Parameters::new();
     //         params2.add_param("amplitude", 1.0).unwrap();
     //         params2.add_param("center", 0.0).unwrap();
     //         params2.add_param("sigma", 1.0).unwrap();
     //         params2.add_param("baseline", 0.5).unwrap();
-    //         
+    //
     //         // Create base models with Gaussian functions
     //         let gaussian1 = BaseModel::new(
     //             params1,
@@ -703,18 +739,18 @@ mod tests {
     //                 let center = params.get("center").unwrap().value();
     //                 let sigma = params.get("sigma").unwrap().value();
     //                 let baseline = params.get("baseline").unwrap().value();
-    //                 
+    //
     //                 let result = x.iter()
     //                     .map(|&x_val| {
     //                         let arg = (x_val - center) / sigma;
     //                         amplitude * f64::exp(-0.5 * arg * arg) + baseline
     //                     })
     //                     .collect::<Vec<f64>>();
-    //                 
+    //
     //                 Ok(Array1::from_vec(result))
     //             }
     //         );
-    //         
+    //
     //         let gaussian2 = BaseModel::new(
     //             params2,
     //             move |params, x| {
@@ -722,23 +758,23 @@ mod tests {
     //                 let center = params.get("center").unwrap().value();
     //                 let sigma = params.get("sigma").unwrap().value();
     //                 let baseline = params.get("baseline").unwrap().value();
-    //                 
+    //
     //                 let result = x.iter()
     //                     .map(|&x_val| {
     //                         let arg = (x_val - center) / sigma;
     //                         amplitude * f64::exp(-0.5 * arg * arg) + baseline
     //                     })
     //                     .collect::<Vec<f64>>();
-    //                 
+    //
     //                 Ok(Array1::from_vec(result))
     //             }
     //         );
-    //         
+    //
     //         // Create a map of shared parameters
     //         let mut shared_params = HashMap::new();
     //         shared_params.insert("center".to_string(), "center".to_string());
     //         shared_params.insert("sigma".to_string(), "sigma".to_string());
-    //         
+    //
     //         // Create a composite model with shared parameters
     //         let mut composite = composite_with_shared_params(
     //             gaussian1,
@@ -746,20 +782,20 @@ mod tests {
     //             Operation::Add,
     //             shared_params,
     //         ).unwrap();
-    //         
+    //
     //         // Set parameters
     //         composite.parameters_mut().get_mut("left_amplitude").unwrap().set_value(2.0).unwrap();
     //         composite.parameters_mut().get_mut("left_center").unwrap().set_value(0.0).unwrap();
     //         composite.parameters_mut().get_mut("left_sigma").unwrap().set_value(1.0).unwrap();
     //         composite.parameters_mut().get_mut("left_baseline").unwrap().set_value(0.0).unwrap();
-    //         
+    //
     //         composite.parameters_mut().get_mut("right_amplitude").unwrap().set_value(1.0).unwrap();
     //         composite.parameters_mut().get_mut("right_baseline").unwrap().set_value(0.5).unwrap();
-    //         
+    //
     //         // Test evaluation
     //         let x = array![-2.0, -1.0, 0.0, 1.0, 2.0];
     //         let y = composite.eval(&x).unwrap();
-    //         
+    //
     //         // Expected: gaussian1(x) + gaussian2(x) with shared center and sigma
     //         // gaussian1: 2.0 * exp(-0.5 * x^2) + 0.0
     //         // gaussian2: 1.0 * exp(-0.5 * x^2) + 0.5
@@ -770,16 +806,16 @@ mod tests {
     //             (2.0 * f64::exp(-0.5 * 1.0) + 0.0) + (1.0 * f64::exp(-0.5 * 1.0) + 0.5),  // x = 1
     //             (2.0 * f64::exp(-0.5 * 4.0) + 0.0) + (1.0 * f64::exp(-0.5 * 4.0) + 0.5),  // x = 2
     //         ];
-    //         
+    //
     //         assert_eq!(y.len(), 5);
     //         for i in 0..y.len() {
     //             assert_relative_eq!(y[i], expected[i], epsilon = 1e-10);
     //         }
-    //         
+    //
     //         // Change a shared parameter and verify both models update
     //         composite.parameters_mut().get_mut("left_center").unwrap().set_value(1.0).unwrap();
     //         let y = composite.eval(&x).unwrap();
-    //         
+    //
     //         // Expected: gaussian1(x) + gaussian2(x) with shared center=1.0 and sigma=1.0
     //         // gaussian1: 2.0 * exp(-0.5 * (x-1)^2) + 0.0
     //         // gaussian2: 1.0 * exp(-0.5 * (x-1)^2) + 0.5
@@ -790,7 +826,7 @@ mod tests {
     //             (2.0 * f64::exp(-0.5 * 0.0) + 0.0) + (1.0 * f64::exp(-0.5 * 0.0) + 0.5),  // x = 1
     //             (2.0 * f64::exp(-0.5 * 1.0) + 0.0) + (1.0 * f64::exp(-0.5 * 1.0) + 0.5),  // x = 2
     //         ];
-    //         
+    //
     //         assert_eq!(y.len(), 5);
     //         for i in 0..y.len() {
     //             assert_relative_eq!(y[i], expected[i], epsilon = 1e-10);

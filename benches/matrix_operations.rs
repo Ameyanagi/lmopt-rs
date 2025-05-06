@@ -7,14 +7,13 @@
 extern crate test;
 
 use faer::{mat, Col, Mat, MatRef};
-use ndarray::{Array1, Array2};
 use nalgebra::{DMatrix, DVector};
+use ndarray::{Array1, Array2};
 use test::Bencher;
 
 // Import utility functions for matrix conversions
 use lmopt_rs::utils::matrix_convert::{
-    ndarray_to_faer, faer_to_ndarray,
-    ndarray_to_nalgebra, nalgebra_to_ndarray,
+    faer_to_ndarray, nalgebra_to_ndarray, ndarray_to_faer, ndarray_to_nalgebra,
 };
 
 /// Benchmark matrix multiplication with ndarray
@@ -22,10 +21,8 @@ use lmopt_rs::utils::matrix_convert::{
 fn bench_ndarray_matmul_100x100(b: &mut Bencher) {
     let a = Array2::<f64>::ones((100, 100));
     let b = Array2::<f64>::ones((100, 100));
-    
-    b.iter(|| {
-        test::black_box(a.dot(&b))
-    });
+
+    b.iter(|| test::black_box(a.dot(&b)));
 }
 
 /// Benchmark matrix multiplication with faer
@@ -33,10 +30,8 @@ fn bench_ndarray_matmul_100x100(b: &mut Bencher) {
 fn bench_faer_matmul_100x100(b: &mut Bencher) {
     let a = Mat::<f64>::ones(100, 100);
     let b = Mat::<f64>::ones(100, 100);
-    
-    b.iter(|| {
-        test::black_box(&a * &b)
-    });
+
+    b.iter(|| test::black_box(&a * &b));
 }
 
 /// Benchmark matrix multiplication with nalgebra
@@ -44,29 +39,25 @@ fn bench_faer_matmul_100x100(b: &mut Bencher) {
 fn bench_nalgebra_matmul_100x100(b: &mut Bencher) {
     let a = DMatrix::<f64>::repeat(100, 100, 1.0);
     let b = DMatrix::<f64>::repeat(100, 100, 1.0);
-    
-    b.iter(|| {
-        test::black_box(&a * &b)
-    });
+
+    b.iter(|| test::black_box(&a * &b));
 }
 
 /// Benchmark QR decomposition with ndarray_linalg
 #[bench]
 fn bench_ndarray_qr_100x50(b: &mut Bencher) {
     use ndarray_linalg::QR;
-    
+
     let a = Array2::<f64>::ones((100, 50));
-    
-    b.iter(|| {
-        test::black_box(a.qr().unwrap())
-    });
+
+    b.iter(|| test::black_box(a.qr().unwrap()));
 }
 
 /// Benchmark QR decomposition with faer
 #[bench]
 fn bench_faer_qr_100x50(b: &mut Bencher) {
     let a = Mat::<f64>::ones(100, 50);
-    
+
     b.iter(|| {
         let mut q = Mat::<f64>::zeros(100, 50);
         let mut r = Mat::<f64>::zeros(50, 50);
@@ -84,52 +75,42 @@ fn bench_faer_qr_100x50(b: &mut Bencher) {
 #[bench]
 fn bench_nalgebra_qr_100x50(b: &mut Bencher) {
     use nalgebra::QR;
-    
+
     let a = DMatrix::<f64>::repeat(100, 50, 1.0);
-    
-    b.iter(|| {
-        test::black_box(a.qr())
-    });
+
+    b.iter(|| test::black_box(a.qr()));
 }
 
 /// Benchmark matrix conversion from ndarray to faer
 #[bench]
 fn bench_ndarray_to_faer_100x100(b: &mut Bencher) {
     let a = Array2::<f64>::ones((100, 100));
-    
-    b.iter(|| {
-        test::black_box(ndarray_to_faer(&a))
-    });
+
+    b.iter(|| test::black_box(ndarray_to_faer(&a)));
 }
 
 /// Benchmark matrix conversion from faer to ndarray
 #[bench]
 fn bench_faer_to_ndarray_100x100(b: &mut Bencher) {
     let a = Mat::<f64>::ones(100, 100);
-    
-    b.iter(|| {
-        test::black_box(faer_to_ndarray(&a))
-    });
+
+    b.iter(|| test::black_box(faer_to_ndarray(&a)));
 }
 
 /// Benchmark matrix conversion from ndarray to nalgebra
 #[bench]
 fn bench_ndarray_to_nalgebra_100x100(b: &mut Bencher) {
     let a = Array2::<f64>::ones((100, 100));
-    
-    b.iter(|| {
-        test::black_box(ndarray_to_nalgebra(&a))
-    });
+
+    b.iter(|| test::black_box(ndarray_to_nalgebra(&a)));
 }
 
 /// Benchmark matrix conversion from nalgebra to ndarray
 #[bench]
 fn bench_nalgebra_to_ndarray_100x100(b: &mut Bencher) {
     let a = DMatrix::<f64>::repeat(100, 100, 1.0);
-    
-    b.iter(|| {
-        test::black_box(nalgebra_to_ndarray(&a))
-    });
+
+    b.iter(|| test::black_box(nalgebra_to_ndarray(&a)));
 }
 
 /// Benchmark vector operations with ndarray
@@ -137,7 +118,7 @@ fn bench_nalgebra_to_ndarray_100x100(b: &mut Bencher) {
 fn bench_ndarray_vector_ops_1000(b: &mut Bencher) {
     let a = Array1::<f64>::ones(1000);
     let b = Array1::<f64>::ones(1000);
-    
+
     b.iter(|| {
         // Vector addition, dot product, and norm
         let c = &a + &b;
@@ -152,7 +133,7 @@ fn bench_ndarray_vector_ops_1000(b: &mut Bencher) {
 fn bench_faer_vector_ops_1000(b: &mut Bencher) {
     let a = Mat::<f64>::ones(1000, 1);
     let b = Mat::<f64>::ones(1000, 1);
-    
+
     b.iter(|| {
         // Vector addition, dot product, and norm
         let c = &a + &b;
@@ -167,7 +148,7 @@ fn bench_faer_vector_ops_1000(b: &mut Bencher) {
 fn bench_nalgebra_vector_ops_1000(b: &mut Bencher) {
     let a = DVector::<f64>::repeat(1000, 1.0);
     let b = DVector::<f64>::repeat(1000, 1.0);
-    
+
     b.iter(|| {
         // Vector addition, dot product, and norm
         let c = &a + &b;
@@ -181,7 +162,7 @@ fn bench_nalgebra_vector_ops_1000(b: &mut Bencher) {
 #[bench]
 fn bench_ndarray_solve_100x100(b: &mut Bencher) {
     use ndarray_linalg::Solve;
-    
+
     // Create a matrix and vector
     let mut a = Array2::<f64>::eye(100);
     for i in 0..100 {
@@ -189,17 +170,15 @@ fn bench_ndarray_solve_100x100(b: &mut Bencher) {
             a[[i, j]] = (i as f64 + 1.0) / (j as f64 + 1.0);
         }
     }
-    
+
     // Ensure the matrix is not singular
     for i in 0..100 {
         a[[i, i]] += 100.0;
     }
-    
+
     let b = Array1::<f64>::ones(100);
-    
-    b.iter(|| {
-        test::black_box(a.solve(&b).unwrap())
-    });
+
+    b.iter(|| test::black_box(a.solve(&b).unwrap()));
 }
 
 /// Benchmark solving a linear system with faer
@@ -212,14 +191,14 @@ fn bench_faer_solve_100x100(b: &mut Bencher) {
             a.write(i, j, (i as f64 + 1.0) / (j as f64 + 1.0));
         }
     }
-    
+
     // Ensure the matrix is not singular
     for i in 0..100 {
         a.write(i, i, a.read(i, i) + 100.0);
     }
-    
+
     let b = Mat::<f64>::ones(100, 1);
-    
+
     b.iter(|| {
         let mut x = Mat::<f64>::zeros(100, 1);
         test::black_box(faer::linalg::solvers::dense::general::solve(
@@ -241,15 +220,13 @@ fn bench_nalgebra_solve_100x100(b: &mut Bencher) {
             a[(i, j)] = (i as f64 + 1.0) / (j as f64 + 1.0);
         }
     }
-    
+
     // Ensure the matrix is not singular
     for i in 0..100 {
         a[(i, i)] += 100.0;
     }
-    
+
     let b = DVector::<f64>::repeat(100, 1.0);
-    
-    b.iter(|| {
-        test::black_box(a.clone().lu().solve(&b).unwrap())
-    });
+
+    b.iter(|| test::black_box(a.clone().lu().solve(&b).unwrap()));
 }

@@ -1,0 +1,1122 @@
+//! Peak models for fitting spectroscopic and other peak data.
+//!
+//! This module provides models for common peak shapes used in spectroscopy
+//! and other fields, including Gaussian, Lorentzian, Voigt, and PseudoVoigt.
+
+use ndarray::{Array1, Array2};
+use crate::error::{LmOptError, Result};
+use crate::parameters::{Parameters, Parameter};
+use crate::model::{Model, BaseModel};
+use std::f64::consts::PI;
+
+/// A Gaussian peak model
+///
+/// The Gaussian function is defined as:
+///
+/// f(x) = amplitude * exp(-(x-center)^2 / (2*sigma^2)) + baseline
+///
+/// Where:
+/// - amplitude: the height of the peak
+/// - center: the position of the peak center
+/// - sigma: the width parameter (standard deviation)
+/// - baseline: the baseline offset
+pub struct GaussianModel {
+    model: BaseModel,
+    prefix: String,
+    with_init: bool,
+}
+
+impl GaussianModel {
+    /// Create a new Gaussian model with the specified parameter prefix
+    ///
+    /// # Arguments
+    ///
+    /// * `prefix` - The prefix for parameter names
+    /// * `with_init` - Whether to initialize parameters with reasonable values based on data
+    ///
+    /// # Returns
+    ///
+    /// * A new GaussianModel
+    pub fn new(prefix: &str, with_init: bool) -> Self {
+        let prefix = prefix.to_string();
+        
+        // Create parameters
+        let mut parameters = Parameters::new();
+        parameters.add_param(&format!("{}amplitude", prefix), 1.0).unwrap();
+        parameters.add_param(&format!("{}center", prefix), 0.0).unwrap();
+        parameters.add_param(&format!("{}sigma", prefix), 1.0).unwrap();
+        parameters.add_param(&format!("{}baseline", prefix), 0.0).unwrap();
+        
+        // Ensure sigma is positive
+        parameters.get_mut(&format!("{}sigma", prefix)).unwrap()
+            .set_min(0.0).unwrap();
+        
+        // Create the base model
+        let model = BaseModel::new(
+            parameters,
+            move |params, x| {
+                let amplitude = params.get(&format!("{}amplitude", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}amplitude' not found", prefix)
+                    ))?
+                    .value();
+                
+                let center = params.get(&format!("{}center", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}center' not found", prefix)
+                    ))?
+                    .value();
+                
+                let sigma = params.get(&format!("{}sigma", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}sigma' not found", prefix)
+                    ))?
+                    .value();
+                
+                let baseline = params.get(&format!("{}baseline", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}baseline' not found", prefix)
+                    ))?
+                    .value();
+                
+                // Calculate Gaussian function
+                let result = x.iter()
+                    .map(|&x_val| {
+                        let arg = (x_val - center) / sigma;
+                        amplitude * (-0.5 * arg * arg).exp() + baseline
+                    })
+                    .collect::<Vec<f64>>();
+                
+                Ok(Array1::from_vec(result))
+            }
+        ).with_jacobian(
+            move |params, x| {
+                let amplitude = params.get(&format!("{}amplitude", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}amplitude' not found", prefix)
+                    ))?
+                    .value();
+                
+                let center = params.get(&format!("{}center", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}center' not found", prefix)
+                    ))?
+                    .value();
+                
+                let sigma = params.get(&format!("{}sigma", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}sigma' not found", prefix)
+                    ))?
+                    .value();
+                
+                let n = x.len();
+                let n_params = 4; // amplitude, center, sigma, baseline
+                let mut jac = Array2::zeros((n, n_params));
+                
+                for i in 0..n {
+                    let x_val = x[i];
+                    let arg = (x_val - center) / sigma;
+                    let exp_term = (-0.5 * arg * arg).exp();
+                    
+                    // Derivative with respect to amplitude
+                    jac[[i, 0]] = exp_term;
+                    
+                    // Derivative with respect to center
+                    jac[[i, 1]] = amplitude * exp_term * arg / sigma;
+                    
+                    // Derivative with respect to sigma
+                    jac[[i, 2]] = amplitude * exp_term * arg * arg / sigma;
+                    
+                    // Derivative with respect to baseline
+                    jac[[i, 3]] = 1.0;
+                }
+                
+                Ok(jac)
+            }
+        ).with_guess(
+            move |params, x, y| {
+                if !with_init {
+                    return Ok(());
+                }
+                
+                if x.len() < 3 {
+                    return Err(LmOptError::InvalidInput(
+                        "Need at least 3 data points for parameter guessing".to_string()
+                    ));
+                }
+                
+                // Find baseline as minimum y value
+                let baseline = y.iter().fold(std::f64::INFINITY, |a, &b| a.min(b));
+                
+                // Subtract baseline
+                let y_corrected: Vec<f64> = y.iter().map(|&y_val| y_val - baseline).collect();
+                
+                // Find maximum value and its index
+                let (max_idx, &max_val) = y_corrected.iter().enumerate()
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                    .unwrap();
+                
+                // Set center to x value at maximum
+                let center = x[max_idx];
+                
+                // Estimate sigma by looking for points where y drops to half of the max
+                let half_max = max_val / 2.0;
+                let mut sigma_estimate = 1.0;
+                
+                // Find points where y crosses half_max
+                let mut half_max_crossings = Vec::new();
+                for i in 0..x.len()-1 {
+                    if (y_corrected[i] <= half_max && y_corrected[i+1] >= half_max) ||
+                       (y_corrected[i] >= half_max && y_corrected[i+1] <= half_max) {
+                        // Linear interpolation to find exact crossing point
+                        let x1 = x[i];
+                        let x2 = x[i+1];
+                        let y1 = y_corrected[i];
+                        let y2 = y_corrected[i+1];
+                        
+                        let t = (half_max - y1) / (y2 - y1);
+                        let x_cross = x1 + t * (x2 - x1);
+                        
+                        half_max_crossings.push(x_cross);
+                    }
+                }
+                
+                if half_max_crossings.len() >= 2 {
+                    // FWHM = distance between first and last crossing
+                    half_max_crossings.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    let fwhm = half_max_crossings.last().unwrap() - half_max_crossings.first().unwrap();
+                    
+                    // For Gaussian: sigma = FWHM / (2 * sqrt(2 * ln(2)))
+                    sigma_estimate = fwhm / 2.35482;
+                } else {
+                    // Fallback: use 1/10 of the x range
+                    let x_min = x.iter().fold(std::f64::INFINITY, |a, &b| a.min(b));
+                    let x_max = x.iter().fold(std::f64::NEG_INFINITY, |a, &b| a.max(b));
+                    sigma_estimate = (x_max - x_min) / 10.0;
+                }
+                
+                // Update parameters
+                params.get_mut(&format!("{}amplitude", prefix)).unwrap().set_value(max_val)?;
+                params.get_mut(&format!("{}center", prefix)).unwrap().set_value(center)?;
+                params.get_mut(&format!("{}sigma", prefix)).unwrap().set_value(sigma_estimate)?;
+                params.get_mut(&format!("{}baseline", prefix)).unwrap().set_value(baseline)?;
+                
+                Ok(())
+            }
+        );
+        
+        Self { model, prefix, with_init }
+    }
+}
+
+impl Model for GaussianModel {
+    fn parameters(&self) -> &Parameters {
+        self.model.parameters()
+    }
+    
+    fn parameters_mut(&mut self) -> &mut Parameters {
+        self.model.parameters_mut()
+    }
+    
+    fn eval(&self, x: &Array1<f64>) -> Result<Array1<f64>> {
+        self.model.eval(x)
+    }
+    
+    fn jacobian(&self, x: &Array1<f64>) -> Result<Array2<f64>> {
+        self.model.jacobian(x)
+    }
+    
+    fn has_custom_jacobian(&self) -> bool {
+        true
+    }
+    
+    fn guess_parameters(&mut self, x: &Array1<f64>, y: &Array1<f64>) -> Result<()> {
+        self.model.guess_parameters(x, y)
+    }
+}
+
+/// A Lorentzian peak model
+///
+/// The Lorentzian function is defined as:
+///
+/// f(x) = amplitude * gamma^2 / ((x-center)^2 + gamma^2) + baseline
+///
+/// Where:
+/// - amplitude: the height of the peak
+/// - center: the position of the peak center
+/// - gamma: the half-width at half-maximum
+/// - baseline: the baseline offset
+pub struct LorentzianModel {
+    model: BaseModel,
+    prefix: String,
+    with_init: bool,
+}
+
+impl LorentzianModel {
+    /// Create a new Lorentzian model with the specified parameter prefix
+    ///
+    /// # Arguments
+    ///
+    /// * `prefix` - The prefix for parameter names
+    /// * `with_init` - Whether to initialize parameters with reasonable values based on data
+    ///
+    /// # Returns
+    ///
+    /// * A new LorentzianModel
+    pub fn new(prefix: &str, with_init: bool) -> Self {
+        let prefix = prefix.to_string();
+        
+        // Create parameters
+        let mut parameters = Parameters::new();
+        parameters.add_param(&format!("{}amplitude", prefix), 1.0).unwrap();
+        parameters.add_param(&format!("{}center", prefix), 0.0).unwrap();
+        parameters.add_param(&format!("{}gamma", prefix), 1.0).unwrap();
+        parameters.add_param(&format!("{}baseline", prefix), 0.0).unwrap();
+        
+        // Ensure gamma is positive
+        parameters.get_mut(&format!("{}gamma", prefix)).unwrap()
+            .set_min(0.0).unwrap();
+        
+        // Create the base model
+        let model = BaseModel::new(
+            parameters,
+            move |params, x| {
+                let amplitude = params.get(&format!("{}amplitude", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}amplitude' not found", prefix)
+                    ))?
+                    .value();
+                
+                let center = params.get(&format!("{}center", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}center' not found", prefix)
+                    ))?
+                    .value();
+                
+                let gamma = params.get(&format!("{}gamma", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}gamma' not found", prefix)
+                    ))?
+                    .value();
+                
+                let baseline = params.get(&format!("{}baseline", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}baseline' not found", prefix)
+                    ))?
+                    .value();
+                
+                // Calculate Lorentzian function
+                let result = x.iter()
+                    .map(|&x_val| {
+                        let arg = x_val - center;
+                        amplitude * gamma.powi(2) / (arg.powi(2) + gamma.powi(2)) + baseline
+                    })
+                    .collect::<Vec<f64>>();
+                
+                Ok(Array1::from_vec(result))
+            }
+        ).with_jacobian(
+            move |params, x| {
+                let amplitude = params.get(&format!("{}amplitude", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}amplitude' not found", prefix)
+                    ))?
+                    .value();
+                
+                let center = params.get(&format!("{}center", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}center' not found", prefix)
+                    ))?
+                    .value();
+                
+                let gamma = params.get(&format!("{}gamma", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}gamma' not found", prefix)
+                    ))?
+                    .value();
+                
+                let n = x.len();
+                let n_params = 4; // amplitude, center, gamma, baseline
+                let mut jac = Array2::zeros((n, n_params));
+                
+                for i in 0..n {
+                    let x_val = x[i];
+                    let arg = x_val - center;
+                    let denom = arg.powi(2) + gamma.powi(2);
+                    
+                    // Derivative with respect to amplitude
+                    jac[[i, 0]] = gamma.powi(2) / denom;
+                    
+                    // Derivative with respect to center
+                    jac[[i, 1]] = amplitude * 2.0 * gamma.powi(2) * arg / denom.powi(2);
+                    
+                    // Derivative with respect to gamma
+                    jac[[i, 2]] = amplitude * 2.0 * gamma * (1.0 - arg.powi(2) / denom) / denom;
+                    
+                    // Derivative with respect to baseline
+                    jac[[i, 3]] = 1.0;
+                }
+                
+                Ok(jac)
+            }
+        ).with_guess(
+            move |params, x, y| {
+                if !with_init {
+                    return Ok(());
+                }
+                
+                if x.len() < 3 {
+                    return Err(LmOptError::InvalidInput(
+                        "Need at least 3 data points for parameter guessing".to_string()
+                    ));
+                }
+                
+                // Find baseline as minimum y value
+                let baseline = y.iter().fold(std::f64::INFINITY, |a, &b| a.min(b));
+                
+                // Subtract baseline
+                let y_corrected: Vec<f64> = y.iter().map(|&y_val| y_val - baseline).collect();
+                
+                // Find maximum value and its index
+                let (max_idx, &max_val) = y_corrected.iter().enumerate()
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                    .unwrap();
+                
+                // Set center to x value at maximum
+                let center = x[max_idx];
+                
+                // Estimate gamma by looking for points where y drops to half of the max
+                let half_max = max_val / 2.0;
+                let mut gamma_estimate = 1.0;
+                
+                // Find points where y crosses half_max
+                let mut half_max_crossings = Vec::new();
+                for i in 0..x.len()-1 {
+                    if (y_corrected[i] <= half_max && y_corrected[i+1] >= half_max) ||
+                       (y_corrected[i] >= half_max && y_corrected[i+1] <= half_max) {
+                        // Linear interpolation to find exact crossing point
+                        let x1 = x[i];
+                        let x2 = x[i+1];
+                        let y1 = y_corrected[i];
+                        let y2 = y_corrected[i+1];
+                        
+                        let t = (half_max - y1) / (y2 - y1);
+                        let x_cross = x1 + t * (x2 - x1);
+                        
+                        half_max_crossings.push(x_cross);
+                    }
+                }
+                
+                if half_max_crossings.len() >= 2 {
+                    // FWHM = distance between first and last crossing
+                    half_max_crossings.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    let fwhm = half_max_crossings.last().unwrap() - half_max_crossings.first().unwrap();
+                    
+                    // For Lorentzian: gamma = FWHM / 2
+                    gamma_estimate = fwhm / 2.0;
+                } else {
+                    // Fallback: use 1/10 of the x range
+                    let x_min = x.iter().fold(std::f64::INFINITY, |a, &b| a.min(b));
+                    let x_max = x.iter().fold(std::f64::NEG_INFINITY, |a, &b| a.max(b));
+                    gamma_estimate = (x_max - x_min) / 10.0;
+                }
+                
+                // Update parameters
+                params.get_mut(&format!("{}amplitude", prefix)).unwrap().set_value(max_val)?;
+                params.get_mut(&format!("{}center", prefix)).unwrap().set_value(center)?;
+                params.get_mut(&format!("{}gamma", prefix)).unwrap().set_value(gamma_estimate)?;
+                params.get_mut(&format!("{}baseline", prefix)).unwrap().set_value(baseline)?;
+                
+                Ok(())
+            }
+        );
+        
+        Self { model, prefix, with_init }
+    }
+}
+
+impl Model for LorentzianModel {
+    fn parameters(&self) -> &Parameters {
+        self.model.parameters()
+    }
+    
+    fn parameters_mut(&mut self) -> &mut Parameters {
+        self.model.parameters_mut()
+    }
+    
+    fn eval(&self, x: &Array1<f64>) -> Result<Array1<f64>> {
+        self.model.eval(x)
+    }
+    
+    fn jacobian(&self, x: &Array1<f64>) -> Result<Array2<f64>> {
+        self.model.jacobian(x)
+    }
+    
+    fn has_custom_jacobian(&self) -> bool {
+        true
+    }
+    
+    fn guess_parameters(&mut self, x: &Array1<f64>, y: &Array1<f64>) -> Result<()> {
+        self.model.guess_parameters(x, y)
+    }
+}
+
+/// A Voigt peak model (convolution of Gaussian and Lorentzian)
+///
+/// The Voigt function is a convolution of a Gaussian and a Lorentzian profile.
+/// This implementation uses an approximation that combines Gaussian and Lorentzian
+/// components with a numerical approximation.
+///
+/// Parameters:
+/// - amplitude: the peak height
+/// - center: the peak center
+/// - sigma: the Gaussian width parameter
+/// - gamma: the Lorentzian width parameter
+/// - baseline: the baseline offset
+pub struct VoigtModel {
+    model: BaseModel,
+    prefix: String,
+    with_init: bool,
+}
+
+impl VoigtModel {
+    /// Create a new Voigt model with the specified parameter prefix
+    ///
+    /// # Arguments
+    ///
+    /// * `prefix` - The prefix for parameter names
+    /// * `with_init` - Whether to initialize parameters with reasonable values based on data
+    ///
+    /// # Returns
+    ///
+    /// * A new VoigtModel
+    pub fn new(prefix: &str, with_init: bool) -> Self {
+        let prefix = prefix.to_string();
+        
+        // Create parameters
+        let mut parameters = Parameters::new();
+        parameters.add_param(&format!("{}amplitude", prefix), 1.0).unwrap();
+        parameters.add_param(&format!("{}center", prefix), 0.0).unwrap();
+        parameters.add_param(&format!("{}sigma", prefix), 1.0).unwrap();
+        parameters.add_param(&format!("{}gamma", prefix), 1.0).unwrap();
+        parameters.add_param(&format!("{}baseline", prefix), 0.0).unwrap();
+        
+        // Ensure sigma and gamma are positive
+        parameters.get_mut(&format!("{}sigma", prefix)).unwrap()
+            .set_min(0.0).unwrap();
+        parameters.get_mut(&format!("{}gamma", prefix)).unwrap()
+            .set_min(0.0).unwrap();
+        
+        // Create the base model
+        let model = BaseModel::new(
+            parameters,
+            move |params, x| {
+                let amplitude = params.get(&format!("{}amplitude", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}amplitude' not found", prefix)
+                    ))?
+                    .value();
+                
+                let center = params.get(&format!("{}center", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}center' not found", prefix)
+                    ))?
+                    .value();
+                
+                let sigma = params.get(&format!("{}sigma", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}sigma' not found", prefix)
+                    ))?
+                    .value();
+                
+                let gamma = params.get(&format!("{}gamma", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}gamma' not found", prefix)
+                    ))?
+                    .value();
+                
+                let baseline = params.get(&format!("{}baseline", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}baseline' not found", prefix)
+                    ))?
+                    .value();
+                
+                // Calculate Voigt function using the Humliček approximation
+                // (a simpler version that's adequate for most purposes)
+                let result = x.iter()
+                    .map(|&x_val| {
+                        let z_real = (x_val - center) / (sigma * std::f64::consts::SQRT_2);
+                        let z_imag = gamma / (sigma * std::f64::consts::SQRT_2);
+                        
+                        // Simple Humlicek approximation
+                        let w_real = humlieck_approx(z_real, z_imag);
+                        
+                        // Scale the result - note the normalization is approximate
+                        let scale = 1.0 / (sigma * std::f64::consts::SQRT_2 * std::f64::consts::PI);
+                        amplitude * scale * w_real + baseline
+                    })
+                    .collect::<Vec<f64>>();
+                
+                Ok(Array1::from_vec(result))
+            }
+        ).with_guess(
+            move |params, x, y| {
+                if !with_init {
+                    return Ok(());
+                }
+                
+                if x.len() < 3 {
+                    return Err(LmOptError::InvalidInput(
+                        "Need at least 3 data points for parameter guessing".to_string()
+                    ));
+                }
+                
+                // Find baseline as minimum y value
+                let baseline = y.iter().fold(std::f64::INFINITY, |a, &b| a.min(b));
+                
+                // Subtract baseline
+                let y_corrected: Vec<f64> = y.iter().map(|&y_val| y_val - baseline).collect();
+                
+                // Find maximum value and its index
+                let (max_idx, &max_val) = y_corrected.iter().enumerate()
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                    .unwrap();
+                
+                // Set center to x value at maximum
+                let center = x[max_idx];
+                
+                // Estimate width by looking for points where y drops to half of the max
+                let half_max = max_val / 2.0;
+                let mut width_estimate = 1.0;
+                
+                // Find points where y crosses half_max
+                let mut half_max_crossings = Vec::new();
+                for i in 0..x.len()-1 {
+                    if (y_corrected[i] <= half_max && y_corrected[i+1] >= half_max) ||
+                       (y_corrected[i] >= half_max && y_corrected[i+1] <= half_max) {
+                        // Linear interpolation to find exact crossing point
+                        let x1 = x[i];
+                        let x2 = x[i+1];
+                        let y1 = y_corrected[i];
+                        let y2 = y_corrected[i+1];
+                        
+                        let t = (half_max - y1) / (y2 - y1);
+                        let x_cross = x1 + t * (x2 - x1);
+                        
+                        half_max_crossings.push(x_cross);
+                    }
+                }
+                
+                if half_max_crossings.len() >= 2 {
+                    // FWHM = distance between first and last crossing
+                    half_max_crossings.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    let fwhm = half_max_crossings.last().unwrap() - half_max_crossings.first().unwrap();
+                    
+                    // For a mix of Gaussian and Lorentzian, use a reasonable split
+                    width_estimate = fwhm / 2.0;
+                } else {
+                    // Fallback: use 1/10 of the x range
+                    let x_min = x.iter().fold(std::f64::INFINITY, |a, &b| a.min(b));
+                    let x_max = x.iter().fold(std::f64::NEG_INFINITY, |a, &b| a.max(b));
+                    width_estimate = (x_max - x_min) / 10.0;
+                }
+                
+                // Split width between Gaussian sigma and Lorentzian gamma
+                let sigma_estimate = width_estimate / 2.0;
+                let gamma_estimate = width_estimate / 2.0;
+                
+                // Normalize the amplitude (approximate)
+                let amplitude_norm = max_val * (sigma_estimate * std::f64::consts::SQRT_2 * std::f64::consts::PI);
+                
+                // Update parameters
+                params.get_mut(&format!("{}amplitude", prefix)).unwrap().set_value(amplitude_norm)?;
+                params.get_mut(&format!("{}center", prefix)).unwrap().set_value(center)?;
+                params.get_mut(&format!("{}sigma", prefix)).unwrap().set_value(sigma_estimate)?;
+                params.get_mut(&format!("{}gamma", prefix)).unwrap().set_value(gamma_estimate)?;
+                params.get_mut(&format!("{}baseline", prefix)).unwrap().set_value(baseline)?;
+                
+                Ok(())
+            }
+        );
+        
+        Self { model, prefix, with_init }
+    }
+}
+
+impl Model for VoigtModel {
+    fn parameters(&self) -> &Parameters {
+        self.model.parameters()
+    }
+    
+    fn parameters_mut(&mut self) -> &mut Parameters {
+        self.model.parameters_mut()
+    }
+    
+    fn eval(&self, x: &Array1<f64>) -> Result<Array1<f64>> {
+        self.model.eval(x)
+    }
+    
+    fn jacobian(&self, x: &Array1<f64>) -> Result<Array2<f64>> {
+        // Use numerical differentiation for Voigt model
+        Err(LmOptError::NotImplemented(
+            "Analytical Jacobian not implemented for VoigtModel".to_string()
+        ))
+    }
+    
+    fn has_custom_jacobian(&self) -> bool {
+        false
+    }
+    
+    fn guess_parameters(&mut self, x: &Array1<f64>, y: &Array1<f64>) -> Result<()> {
+        self.model.guess_parameters(x, y)
+    }
+}
+
+/// A Pseudo-Voigt peak model (simple weighted sum of Gaussian and Lorentzian)
+///
+/// The Pseudo-Voigt function is a linear combination of a Gaussian and a Lorentzian profile:
+///
+/// f(x) = amplitude * (fraction * G(x) + (1 - fraction) * L(x)) + baseline
+///
+/// where G(x) is a Gaussian and L(x) is a Lorentzian, both with the same center and FWHM.
+///
+/// Parameters:
+/// - amplitude: the peak height
+/// - center: the peak center
+/// - sigma: the width parameter
+/// - fraction: the fraction of Gaussian (0 to 1)
+/// - baseline: the baseline offset
+pub struct PseudoVoigtModel {
+    model: BaseModel,
+    prefix: String,
+    with_init: bool,
+}
+
+impl PseudoVoigtModel {
+    /// Create a new PseudoVoigt model with the specified parameter prefix
+    ///
+    /// # Arguments
+    ///
+    /// * `prefix` - The prefix for parameter names
+    /// * `with_init` - Whether to initialize parameters with reasonable values based on data
+    ///
+    /// # Returns
+    ///
+    /// * A new PseudoVoigtModel
+    pub fn new(prefix: &str, with_init: bool) -> Self {
+        let prefix = prefix.to_string();
+        
+        // Create parameters
+        let mut parameters = Parameters::new();
+        parameters.add_param(&format!("{}amplitude", prefix), 1.0).unwrap();
+        parameters.add_param(&format!("{}center", prefix), 0.0).unwrap();
+        parameters.add_param(&format!("{}sigma", prefix), 1.0).unwrap();
+        parameters.add_param(&format!("{}fraction", prefix), 0.5).unwrap();
+        parameters.add_param(&format!("{}baseline", prefix), 0.0).unwrap();
+        
+        // Ensure sigma is positive and fraction is between 0 and 1
+        parameters.get_mut(&format!("{}sigma", prefix)).unwrap()
+            .set_min(0.0).unwrap();
+        parameters.get_mut(&format!("{}fraction", prefix)).unwrap()
+            .set_min(0.0).unwrap()
+            .set_max(1.0).unwrap();
+        
+        // Create the base model
+        let model = BaseModel::new(
+            parameters,
+            move |params, x| {
+                let amplitude = params.get(&format!("{}amplitude", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}amplitude' not found", prefix)
+                    ))?
+                    .value();
+                
+                let center = params.get(&format!("{}center", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}center' not found", prefix)
+                    ))?
+                    .value();
+                
+                let sigma = params.get(&format!("{}sigma", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}sigma' not found", prefix)
+                    ))?
+                    .value();
+                
+                let fraction = params.get(&format!("{}fraction", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}fraction' not found", prefix)
+                    ))?
+                    .value();
+                
+                let baseline = params.get(&format!("{}baseline", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}baseline' not found", prefix)
+                    ))?
+                    .value();
+                
+                // Convert sigma to gamma for Lorentzian (to have same FWHM as Gaussian)
+                let gamma = sigma / std::f64::consts::SQRT_2 * 1.177410;
+                
+                // Calculate PseudoVoigt function
+                let result = x.iter()
+                    .map(|&x_val| {
+                        let arg = (x_val - center) / sigma;
+                        
+                        // Gaussian component
+                        let gaussian = (-0.5 * arg * arg).exp();
+                        
+                        // Lorentzian component
+                        let lorentzian = gamma.powi(2) / ((x_val - center).powi(2) + gamma.powi(2));
+                        
+                        // Combine components
+                        amplitude * (fraction * gaussian + (1.0 - fraction) * lorentzian) + baseline
+                    })
+                    .collect::<Vec<f64>>();
+                
+                Ok(Array1::from_vec(result))
+            }
+        ).with_jacobian(
+            move |params, x| {
+                let amplitude = params.get(&format!("{}amplitude", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}amplitude' not found", prefix)
+                    ))?
+                    .value();
+                
+                let center = params.get(&format!("{}center", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}center' not found", prefix)
+                    ))?
+                    .value();
+                
+                let sigma = params.get(&format!("{}sigma", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}sigma' not found", prefix)
+                    ))?
+                    .value();
+                
+                let fraction = params.get(&format!("{}fraction", prefix))
+                    .ok_or_else(|| LmOptError::ParameterError(
+                        format!("Parameter '{}fraction' not found", prefix)
+                    ))?
+                    .value();
+                
+                let n = x.len();
+                let n_params = 5; // amplitude, center, sigma, fraction, baseline
+                let mut jac = Array2::zeros((n, n_params));
+                
+                // Convert sigma to gamma for Lorentzian (to have same FWHM as Gaussian)
+                let gamma = sigma / std::f64::consts::SQRT_2 * 1.177410;
+                
+                for i in 0..n {
+                    let x_val = x[i];
+                    let arg = (x_val - center) / sigma;
+                    
+                    // Gaussian component
+                    let gaussian = (-0.5 * arg * arg).exp();
+                    
+                    // Lorentzian component
+                    let lorentzian = gamma.powi(2) / ((x_val - center).powi(2) + gamma.powi(2));
+                    
+                    // Mixed component
+                    let mixed = fraction * gaussian + (1.0 - fraction) * lorentzian;
+                    
+                    // Derivative with respect to amplitude
+                    jac[[i, 0]] = mixed;
+                    
+                    // Derivative with respect to center
+                    let dgaussian_dcenter = fraction * gaussian * arg / sigma;
+                    let dlorentzian_dcenter = (1.0 - fraction) * 2.0 * gamma.powi(2) * (x_val - center) / 
+                                              ((x_val - center).powi(2) + gamma.powi(2)).powi(2);
+                    jac[[i, 1]] = amplitude * (dgaussian_dcenter + dlorentzian_dcenter);
+                    
+                    // Derivative with respect to sigma
+                    let dgaussian_dsigma = fraction * gaussian * arg * arg / sigma;
+                    let dgamma_dsigma = 1.177410 / std::f64::consts::SQRT_2;
+                    let dlorentzian_dsigma = (1.0 - fraction) * 2.0 * gamma * dgamma_dsigma * 
+                                             (1.0 - (x_val - center).powi(2) / ((x_val - center).powi(2) + gamma.powi(2))) / 
+                                             ((x_val - center).powi(2) + gamma.powi(2));
+                    jac[[i, 2]] = amplitude * (dgaussian_dsigma + dlorentzian_dsigma);
+                    
+                    // Derivative with respect to fraction
+                    jac[[i, 3]] = amplitude * (gaussian - lorentzian);
+                    
+                    // Derivative with respect to baseline
+                    jac[[i, 4]] = 1.0;
+                }
+                
+                Ok(jac)
+            }
+        ).with_guess(
+            move |params, x, y| {
+                if !with_init {
+                    return Ok(());
+                }
+                
+                if x.len() < 3 {
+                    return Err(LmOptError::InvalidInput(
+                        "Need at least 3 data points for parameter guessing".to_string()
+                    ));
+                }
+                
+                // Find baseline as minimum y value
+                let baseline = y.iter().fold(std::f64::INFINITY, |a, &b| a.min(b));
+                
+                // Subtract baseline
+                let y_corrected: Vec<f64> = y.iter().map(|&y_val| y_val - baseline).collect();
+                
+                // Find maximum value and its index
+                let (max_idx, &max_val) = y_corrected.iter().enumerate()
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                    .unwrap();
+                
+                // Set center to x value at maximum
+                let center = x[max_idx];
+                
+                // Estimate sigma by looking for points where y drops to half of the max
+                let half_max = max_val / 2.0;
+                let mut sigma_estimate = 1.0;
+                
+                // Find points where y crosses half_max
+                let mut half_max_crossings = Vec::new();
+                for i in 0..x.len()-1 {
+                    if (y_corrected[i] <= half_max && y_corrected[i+1] >= half_max) ||
+                       (y_corrected[i] >= half_max && y_corrected[i+1] <= half_max) {
+                        // Linear interpolation to find exact crossing point
+                        let x1 = x[i];
+                        let x2 = x[i+1];
+                        let y1 = y_corrected[i];
+                        let y2 = y_corrected[i+1];
+                        
+                        let t = (half_max - y1) / (y2 - y1);
+                        let x_cross = x1 + t * (x2 - x1);
+                        
+                        half_max_crossings.push(x_cross);
+                    }
+                }
+                
+                if half_max_crossings.len() >= 2 {
+                    // FWHM = distance between first and last crossing
+                    half_max_crossings.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    let fwhm = half_max_crossings.last().unwrap() - half_max_crossings.first().unwrap();
+                    
+                    // For a PseudoVoigt, use the Gaussian width calculation as an approximation
+                    sigma_estimate = fwhm / 2.35482;
+                } else {
+                    // Fallback: use 1/10 of the x range
+                    let x_min = x.iter().fold(std::f64::INFINITY, |a, &b| a.min(b));
+                    let x_max = x.iter().fold(std::f64::NEG_INFINITY, |a, &b| a.max(b));
+                    sigma_estimate = (x_max - x_min) / 10.0;
+                }
+                
+                // Update parameters
+                params.get_mut(&format!("{}amplitude", prefix)).unwrap().set_value(max_val)?;
+                params.get_mut(&format!("{}center", prefix)).unwrap().set_value(center)?;
+                params.get_mut(&format!("{}sigma", prefix)).unwrap().set_value(sigma_estimate)?;
+                params.get_mut(&format!("{}fraction", prefix)).unwrap().set_value(0.5)?;
+                params.get_mut(&format!("{}baseline", prefix)).unwrap().set_value(baseline)?;
+                
+                Ok(())
+            }
+        );
+        
+        Self { model, prefix, with_init }
+    }
+}
+
+impl Model for PseudoVoigtModel {
+    fn parameters(&self) -> &Parameters {
+        self.model.parameters()
+    }
+    
+    fn parameters_mut(&mut self) -> &mut Parameters {
+        self.model.parameters_mut()
+    }
+    
+    fn eval(&self, x: &Array1<f64>) -> Result<Array1<f64>> {
+        self.model.eval(x)
+    }
+    
+    fn jacobian(&self, x: &Array1<f64>) -> Result<Array2<f64>> {
+        self.model.jacobian(x)
+    }
+    
+    fn has_custom_jacobian(&self) -> bool {
+        true
+    }
+    
+    fn guess_parameters(&mut self, x: &Array1<f64>, y: &Array1<f64>) -> Result<()> {
+        self.model.guess_parameters(x, y)
+    }
+}
+
+// Humlicek approximation to the Faddeeva function w(z)
+// This is a simple approximation that is adequate for most purposes
+fn humlieck_approx(x: f64, y: f64) -> f64 {
+    let t = y / (x * x + y * y).sqrt();
+    let a = 0.5 * t * ((1.5 - t * t) / (1.0 - t * t));
+    let b = 0.5 * PI * (-(x * x + (y - 1.0) * (y - 1.0))).exp();
+    a + b
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ndarray::array;
+    use approx::assert_relative_eq;
+    
+    #[test]
+    fn test_gaussian_model() {
+        let model = GaussianModel::new("", true);
+        let x = array![-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0];
+        
+        let y = model.eval(&x).unwrap();
+        
+        // Expected values for a Gaussian with amplitude=1, center=0, sigma=1, baseline=0
+        // f(x) = exp(-x^2/2)
+        let expected = vec![
+            0.011108996538242, 0.135335283236613, 0.606530659712633, 1.0,
+            0.606530659712633, 0.135335283236613, 0.011108996538242
+        ];
+        
+        assert_eq!(y.len(), 7);
+        for i in 0..y.len() {
+            assert_relative_eq!(y[i], expected[i], epsilon = 1e-10);
+        }
+    }
+    
+    #[test]
+    fn test_lorentzian_model() {
+        let model = LorentzianModel::new("", true);
+        let x = array![-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0];
+        
+        let y = model.eval(&x).unwrap();
+        
+        // Expected values for a Lorentzian with amplitude=1, center=0, gamma=1, baseline=0
+        // f(x) = 1/(x^2 + 1)
+        let expected = vec![0.1, 0.2, 0.5, 1.0, 0.5, 0.2, 0.1];
+        
+        assert_eq!(y.len(), 7);
+        for i in 0..y.len() {
+            assert_relative_eq!(y[i], expected[i], epsilon = 1e-10);
+        }
+    }
+    
+    #[test]
+    fn test_gaussian_with_custom_parameters() {
+        let mut model = GaussianModel::new("g_", true);
+        
+        // Set custom parameters
+        model.parameters_mut().get_mut("g_amplitude").unwrap().set_value(2.0).unwrap();
+        model.parameters_mut().get_mut("g_center").unwrap().set_value(1.0).unwrap();
+        model.parameters_mut().get_mut("g_sigma").unwrap().set_value(0.5).unwrap();
+        model.parameters_mut().get_mut("g_baseline").unwrap().set_value(0.5).unwrap();
+        
+        let x = array![0.0, 0.5, 1.0, 1.5, 2.0];
+        let y = model.eval(&x).unwrap();
+        
+        // Expected values for a Gaussian with amplitude=2, center=1, sigma=0.5, baseline=0.5
+        // f(x) = 2 * exp(-(x-1)^2/0.5) + 0.5
+        let expected = vec![
+            0.5 + 2.0 * (-2.0).exp(), 
+            0.5 + 2.0 * (-0.5).exp(),
+            0.5 + 2.0,
+            0.5 + 2.0 * (-0.5).exp(),
+            0.5 + 2.0 * (-2.0).exp()
+        ];
+        
+        assert_eq!(y.len(), 5);
+        for i in 0..y.len() {
+            assert_relative_eq!(y[i], expected[i], epsilon = 1e-10);
+        }
+    }
+    
+    #[test]
+    fn test_parameter_guessing() {
+        // Create a Gaussian peak with known parameters
+        let mut known_model = GaussianModel::new("", true);
+        known_model.parameters_mut().get_mut("amplitude").unwrap().set_value(3.0).unwrap();
+        known_model.parameters_mut().get_mut("center").unwrap().set_value(5.0).unwrap();
+        known_model.parameters_mut().get_mut("sigma").unwrap().set_value(1.0).unwrap();
+        known_model.parameters_mut().get_mut("baseline").unwrap().set_value(1.0).unwrap();
+        
+        // Generate data from the known model
+        let x = Array1::linspace(0.0, 10.0, 100);
+        let y = known_model.eval(&x).unwrap();
+        
+        // Create a new model and guess parameters
+        let mut model = GaussianModel::new("", true);
+        model.guess_parameters(&x, &y).unwrap();
+        
+        // Check that guessed parameters are close to known values
+        assert_relative_eq!(
+            model.parameters().get("amplitude").unwrap().value(),
+            3.0,
+            epsilon = 0.1
+        );
+        assert_relative_eq!(
+            model.parameters().get("center").unwrap().value(),
+            5.0,
+            epsilon = 0.1
+        );
+        assert_relative_eq!(
+            model.parameters().get("sigma").unwrap().value(),
+            1.0,
+            epsilon = 0.1
+        );
+        assert_relative_eq!(
+            model.parameters().get("baseline").unwrap().value(),
+            1.0,
+            epsilon = 0.1
+        );
+    }
+    
+    #[test]
+    fn test_model_integration() {
+        use crate::model::fit;
+        
+        // Create synthetic data from a Gaussian
+        let mut true_model = GaussianModel::new("", true);
+        true_model.parameters_mut().get_mut("amplitude").unwrap().set_value(2.5).unwrap();
+        true_model.parameters_mut().get_mut("center").unwrap().set_value(4.0).unwrap();
+        true_model.parameters_mut().get_mut("sigma").unwrap().set_value(0.8).unwrap();
+        true_model.parameters_mut().get_mut("baseline").unwrap().set_value(0.5).unwrap();
+        
+        let x = Array1::linspace(0.0, 8.0, 40);
+        let y_true = true_model.eval(&x).unwrap();
+        
+        // Add some noise
+        use ndarray::Array;
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let noise: Array1<f64> = Array::from_iter((0..40).map(|_| rng.gen_range(-0.1..0.1)));
+        let y_noisy = &y_true + &noise;
+        
+        // Create a model to fit
+        let mut model = GaussianModel::new("", true);
+        
+        // Reset parameters to generic starting values
+        model.parameters_mut().get_mut("amplitude").unwrap().set_value(1.0).unwrap();
+        model.parameters_mut().get_mut("center").unwrap().set_value(3.0).unwrap();
+        model.parameters_mut().get_mut("sigma").unwrap().set_value(1.0).unwrap();
+        model.parameters_mut().get_mut("baseline").unwrap().set_value(0.0).unwrap();
+        
+        // Fit the model
+        let result = fit(&mut model, x.clone(), y_noisy.clone()).unwrap();
+        
+        // Check that the fit succeeded
+        assert!(result.success);
+        
+        // Check that fitted parameters are close to true values
+        let amplitude = model.parameters().get("amplitude").unwrap().value();
+        let center = model.parameters().get("center").unwrap().value();
+        let sigma = model.parameters().get("sigma").unwrap().value();
+        let baseline = model.parameters().get("baseline").unwrap().value();
+        
+        assert_relative_eq!(amplitude, 2.5, epsilon = 0.2);
+        assert_relative_eq!(center, 4.0, epsilon = 0.2);
+        assert_relative_eq!(sigma, 0.8, epsilon = 0.2);
+        assert_relative_eq!(baseline, 0.5, epsilon = 0.2);
+    }
+}

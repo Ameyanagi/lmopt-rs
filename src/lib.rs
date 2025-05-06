@@ -23,7 +23,7 @@ pub mod parameters;
 
 // Conditional modules
 #[cfg(feature = "matrix")]
-mod utils;
+pub mod utils;
 
 #[cfg(feature = "lm")]
 pub mod problem;
@@ -41,7 +41,7 @@ pub mod uncertainty;
 pub mod model;
 
 #[cfg(feature = "lm")]
-mod models;
+pub mod models;
 
 // Re-exports for convenience
 pub use error::{LmOptError, Result};
@@ -57,17 +57,18 @@ pub use problem_params::ParameterProblem;
 
 #[cfg(feature = "lm")]
 pub use uncertainty::{
-    UncertaintyCalculator, 
-    UncertaintyResult, 
-    ConfidenceInterval,
-    MonteCarloResult,
-    covariance_matrix, 
-    standard_errors,
-    uncertainty_analysis,
-    uncertainty_analysis_with_monte_carlo,
-    monte_carlo_covariance,
-    monte_carlo_refit,
-    propagate_uncertainty,
+    covariance_matrix, monte_carlo_covariance, monte_carlo_refit, propagate_uncertainty,
+    standard_errors, uncertainty_analysis, uncertainty_analysis_with_monte_carlo,
+    ConfidenceInterval, MonteCarloResult, UncertaintyCalculator, UncertaintyResult,
+};
+
+#[cfg(feature = "lm")]
+pub mod global_opt;
+
+#[cfg(feature = "lm")]
+pub use global_opt::{
+    optimize_global, optimize_global_param_problem, BasinHopping, DifferentialEvolution,
+    GlobalOptResult, GlobalOptimizer, HybridGlobal, SimulatedAnnealing,
 };
 
 /// Version of the library

@@ -12,7 +12,7 @@ impl SimpleContext {
             variables: HashMap::new(),
         }
     }
-    
+
     fn set_variable(&mut self, name: &str, value: f64) {
         self.variables.insert(name.to_string(), value);
     }
@@ -25,34 +25,72 @@ struct Expression {
 
 impl Expression {
     fn parse(input: &str) -> Result<Self, String> {
-        Ok(Self { expr: input.to_string() })
+        Ok(Self {
+            expr: input.to_string(),
+        })
     }
-    
+
     fn evaluate(&self, context: &SimpleContext) -> Result<f64, String> {
         // Simple evaluation logic for testing
         match self.expr.as_str() {
-            "x" => context.variables.get("x").copied().ok_or("Variable x not found".to_string()),
-            "y" => context.variables.get("y").copied().ok_or("Variable y not found".to_string()),
-            "z" => context.variables.get("z").copied().ok_or("Variable z not found".to_string()),
+            "x" => context
+                .variables
+                .get("x")
+                .copied()
+                .ok_or("Variable x not found".to_string()),
+            "y" => context
+                .variables
+                .get("y")
+                .copied()
+                .ok_or("Variable y not found".to_string()),
+            "z" => context
+                .variables
+                .get("z")
+                .copied()
+                .ok_or("Variable z not found".to_string()),
             "x + y" => {
-                let x = context.variables.get("x").copied().ok_or("Variable x not found".to_string())?;
-                let y = context.variables.get("y").copied().ok_or("Variable y not found".to_string())?;
+                let x = context
+                    .variables
+                    .get("x")
+                    .copied()
+                    .ok_or("Variable x not found".to_string())?;
+                let y = context
+                    .variables
+                    .get("y")
+                    .copied()
+                    .ok_or("Variable y not found".to_string())?;
                 Ok(x + y)
-            },
+            }
             "x - y" => {
-                let x = context.variables.get("x").copied().ok_or("Variable x not found".to_string())?;
-                let y = context.variables.get("y").copied().ok_or("Variable y not found".to_string())?;
+                let x = context
+                    .variables
+                    .get("x")
+                    .copied()
+                    .ok_or("Variable x not found".to_string())?;
+                let y = context
+                    .variables
+                    .get("y")
+                    .copied()
+                    .ok_or("Variable y not found".to_string())?;
                 Ok(x - y)
-            },
+            }
             "y - x" => {
-                let x = context.variables.get("x").copied().ok_or("Variable x not found".to_string())?;
-                let y = context.variables.get("y").copied().ok_or("Variable y not found".to_string())?;
+                let x = context
+                    .variables
+                    .get("x")
+                    .copied()
+                    .ok_or("Variable x not found".to_string())?;
+                let y = context
+                    .variables
+                    .get("y")
+                    .copied()
+                    .ok_or("Variable y not found".to_string())?;
                 Ok(y - x)
-            },
+            }
             _ => Err(format!("Unsupported expression: {}", self.expr)),
         }
     }
-    
+
     fn variables(&self) -> Vec<String> {
         // Simple variable extraction logic for testing
         match self.expr.as_str() {
@@ -89,7 +127,7 @@ impl ConstraintType {
             Self::GreaterThanOrEqual => ">=",
         }
     }
-    
+
     fn is_satisfied(&self, value: f64) -> bool {
         match self {
             Self::Equal => value.abs() < 1e-10,
@@ -118,9 +156,9 @@ impl Constraint {
             ConstraintType::GreaterThan => format!("{} - {}", rhs, lhs),
             _ => format!("{} - {}", lhs, rhs),
         };
-        
+
         let expr = Expression::parse(&combined_expr)?;
-        
+
         Ok(Self {
             lhs: lhs.to_string(),
             constraint_type,
@@ -128,7 +166,7 @@ impl Constraint {
             expr: Some(expr),
         })
     }
-    
+
     fn is_satisfied(&self, context: &SimpleContext) -> Result<bool, String> {
         if let Some(expr) = &self.expr {
             let value = expr.evaluate(context)?;
@@ -137,9 +175,14 @@ impl Constraint {
             Err("Expression not initialized".to_string())
         }
     }
-    
+
     fn to_string(&self) -> String {
-        format!("{} {} {}", self.lhs, self.constraint_type.as_operator(), self.rhs)
+        format!(
+            "{} {} {}",
+            self.lhs,
+            self.constraint_type.as_operator(),
+            self.rhs
+        )
     }
 }
 
@@ -154,24 +197,29 @@ impl Constraints {
             constraints: Vec::new(),
         }
     }
-    
+
     fn add(&mut self, constraint: Constraint) {
         self.constraints.push(constraint);
     }
-    
-    fn add_constraint(&mut self, lhs: &str, constraint_type: ConstraintType, rhs: &str) -> Result<(), String> {
+
+    fn add_constraint(
+        &mut self,
+        lhs: &str,
+        constraint_type: ConstraintType,
+        rhs: &str,
+    ) -> Result<(), String> {
         let constraint = Constraint::new(lhs, constraint_type, rhs)?;
         self.add(constraint);
         Ok(())
     }
-    
+
     fn all_satisfied(&self, context: &SimpleContext) -> Result<bool, String> {
         for constraint in &self.constraints {
             if !constraint.is_satisfied(context)? {
                 return Ok(false);
             }
         }
-        
+
         Ok(true)
     }
 }
@@ -181,30 +229,34 @@ fn main() {
     // Test constraint creation
     let constraint = Constraint::new("x", ConstraintType::LessThan, "y").unwrap();
     assert_eq!(constraint.to_string(), "x < y");
-    
+
     // Test constraint satisfaction
     let mut context = SimpleContext::new();
     context.set_variable("x", 5.0);
     context.set_variable("y", 10.0);
-    
+
     assert!(constraint.is_satisfied(&context).unwrap());
-    
+
     // Test constraint violation
     context.set_variable("x", 15.0);
     assert!(!constraint.is_satisfied(&context).unwrap());
-    
+
     // Test constraints collection
     let mut constraints = Constraints::new();
-    constraints.add_constraint("x", ConstraintType::LessThan, "y").unwrap();
-    constraints.add_constraint("x", ConstraintType::GreaterThan, "0").unwrap();
-    
+    constraints
+        .add_constraint("x", ConstraintType::LessThan, "y")
+        .unwrap();
+    constraints
+        .add_constraint("x", ConstraintType::GreaterThan, "0")
+        .unwrap();
+
     context.set_variable("x", 5.0);
     context.set_variable("y", 10.0);
-    
+
     assert!(constraints.all_satisfied(&context).unwrap());
-    
+
     context.set_variable("x", 15.0);
     assert!(!constraints.all_satisfied(&context).unwrap());
-    
+
     println!("All tests passed!");
 }

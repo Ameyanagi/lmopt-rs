@@ -1,0 +1,32 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+        name: "rust: format"
+        description: Format rust code with cargo fmt.
+      - id: cargo-check
+        name: "rust: check"
+        description: Check rust code with cargo check.
+      - id: clippy
+        name: "rust: clippy"
+        description: Lint rust code with clippy.
+
+  - repo: local
+    hooks:
+      - id: rust-tests
+        name: "rust: tests"
+        description: "Run rust tests"
+        entry: cargo test
+        language: system
+        pass_filenames: false
+        files: '\.rs$'
+        types: [file, rust]
