@@ -30,3 +30,4 @@ repos:
         pass_filenames: false
         files: '\.rs$'
         types: [file, rust]
+
