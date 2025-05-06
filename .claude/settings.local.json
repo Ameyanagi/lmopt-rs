@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "WebFetch(domain:enzyme.mit.edu)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:crates.io)",
+      "WebFetch(domain:lib.rs)",
+      "WebFetch(domain:doc.rust-lang.org)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(cargo test)",
+      "Bash(cat:*)",
+      "Bash(cargo test:*)",
+      "Bash(find:*)",
+      "Bash(rm:*)",
+      "Bash(cargo search:*)",
+      "Bash(cargo info:*)",
+      "Bash(RUST_BACKTRACE=1 cargo test parameters::parameters::tests::test_expression_evaluation)",
+      "Bash(cargo check:*)",
+      "WebFetch(domain:docs.rs)",
+      "Bash(cargo doc:*)",
+      "Bash(grep:*)",
+      "Bash(git rm:*)",
+      "Bash(ls:*)"
+    ],
+    "deny": []
+  }
+}

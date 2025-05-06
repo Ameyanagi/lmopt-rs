@@ -1,0 +1,57 @@
+{
+  "coverage": {
+    "matrix_conversion": {
+      "line_coverage": 0,
+      "branch_coverage": 0,
+      "function_coverage": 0
+    },
+    "problem_definition": {
+      "line_coverage": 0,
+      "branch_coverage": 0,
+      "function_coverage": 0
+    },
+    "core_lm_algorithm": {
+      "line_coverage": 0,
+      "branch_coverage": 0,
+      "function_coverage": 0
+    },
+    "parameter_system": {
+      "line_coverage": 0,
+      "branch_coverage": 0,
+      "function_coverage": 0
+    },
+    "uncertainty": {
+      "line_coverage": 0,
+      "branch_coverage": 0,
+      "function_coverage": 0
+    },
+    "model_system": {
+      "line_coverage": 0,
+      "branch_coverage": 0,
+      "function_coverage": 0
+    },
+    "overall": {
+      "line_coverage": 0,
+      "branch_coverage": 0,
+      "function_coverage": 0
+    }
+  },
+  "last_updated": "2025-05-06T00:00:00Z",
+  "test_quality": {
+    "unit_tests": {
+      "count": 0,
+      "passing": 0,
+      "quality_score": 0
+    },
+    "integration_tests": {
+      "count": 0,
+      "passing": 0,
+      "quality_score": 0
+    },
+    "performance_tests": {
+      "count": 0,
+      "passing": 0,
+      "quality_score": 0
+    }
+  }
+}

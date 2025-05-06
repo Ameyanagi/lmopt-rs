@@ -1,0 +1,104 @@
+{
+  "matrix_conversion": {
+    "status": "not_started",
+    "description": "Conversion utilities between matrix types (ndarray, faer, nalgebra)",
+    "phase": 1,
+    "dependencies": []
+  },
+  "problem_definition": {
+    "status": "not_started",
+    "description": "Problem definition trait and implementations",
+    "phase": 1,
+    "dependencies": ["matrix_conversion"]
+  },
+  "core_lm_algorithm": {
+    "status": "not_started",
+    "description": "Core Levenberg-Marquardt algorithm implementation",
+    "phase": 1,
+    "dependencies": ["problem_definition", "matrix_conversion"]
+  },
+  "parameter_system": {
+    "status": "not_started",
+    "description": "Parameter handling with bounds and constraints",
+    "phase": 2,
+    "dependencies": ["core_lm_algorithm"]
+  },
+  "parameter_bounds": {
+    "status": "not_started",
+    "description": "Parameter bounds implementation",
+    "phase": 2,
+    "dependencies": ["parameter_system"]
+  },
+  "parameter_constraints": {
+    "status": "not_started",
+    "description": "Parameter constraints implementation",
+    "phase": 2,
+    "dependencies": ["parameter_system"]
+  },
+  "parameter_expressions": {
+    "status": "not_started",
+    "description": "Parameter expressions implementation",
+    "phase": 2,
+    "dependencies": ["parameter_system"]
+  },
+  "uncertainty_confidence": {
+    "status": "not_started",
+    "description": "Confidence interval calculations",
+    "phase": 3,
+    "dependencies": ["core_lm_algorithm", "parameter_system"]
+  },
+  "uncertainty_covariance": {
+    "status": "not_started",
+    "description": "Covariance matrix estimation",
+    "phase": 3,
+    "dependencies": ["core_lm_algorithm", "parameter_system"]
+  },
+  "uncertainty_monte_carlo": {
+    "status": "not_started",
+    "description": "Monte Carlo uncertainty estimation",
+    "phase": 3,
+    "dependencies": ["uncertainty_covariance", "core_lm_algorithm"]
+  },
+  "uncertainty_profile": {
+    "status": "not_started",
+    "description": "Profile likelihood method",
+    "phase": 3,
+    "dependencies": ["uncertainty_confidence", "core_lm_algorithm"]
+  },
+  "model_system": {
+    "status": "not_started",
+    "description": "Base model trait and implementation",
+    "phase": 4,
+    "dependencies": ["parameter_system", "core_lm_algorithm"]
+  },
+  "models_peak": {
+    "status": "not_started",
+    "description": "Peak model functions (Gaussian, Lorentzian, etc.)",
+    "phase": 4,
+    "dependencies": ["model_system"]
+  },
+  "models_step": {
+    "status": "not_started",
+    "description": "Step model functions",
+    "phase": 4,
+    "dependencies": ["model_system"]
+  },
+  "models_exponential": {
+    "status": "not_started",
+    "description": "Exponential and power law models",
+    "phase": 4,
+    "dependencies": ["model_system"]
+  },
+  "models_polynomial": {
+    "status": "not_started",
+    "description": "Polynomial models",
+    "phase": 4,
+    "dependencies": ["model_system"]
+  },
+  "global_optimization": {
+    "status": "not_started",
+    "description": "Global optimization methods",
+    "phase": 5,
+    "dependencies": ["core_lm_algorithm", "model_system"]
+  }
+}

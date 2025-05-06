@@ -1,0 +1,158 @@
+{
+  "features": [
+    {
+      "id": "F001",
+      "title": "Matrix Conversion Utilities",
+      "description": "Implement conversion between ndarray, faer, and nalgebra matrices",
+      "priority": "high",
+      "status": "not_started",
+      "phase": 1
+    },
+    {
+      "id": "F002",
+      "title": "Problem Definition",
+      "description": "Create problem definition trait compatible with levenberg-marquardt",
+      "priority": "high",
+      "status": "not_started",
+      "phase": 1
+    },
+    {
+      "id": "F003",
+      "title": "Core LM Algorithm",
+      "description": "Implement Levenberg-Marquardt algorithm with trust region",
+      "priority": "high",
+      "status": "not_started",
+      "phase": 1
+    },
+    {
+      "id": "F004",
+      "title": "Parameter Bounds",
+      "description": "Implement parameter bounds (min/max) similar to lmfit-py",
+      "priority": "medium",
+      "status": "not_started",
+      "phase": 2
+    },
+    {
+      "id": "F005",
+      "title": "Parameter Constraints",
+      "description": "Implement parameter constraints similar to lmfit-py",
+      "priority": "medium",
+      "status": "not_started",
+      "phase": 2
+    },
+    {
+      "id": "F006",
+      "title": "Parameter Expressions",
+      "description": "Implement parameter expressions similar to lmfit-py",
+      "priority": "medium",
+      "status": "not_started",
+      "phase": 2
+    },
+    {
+      "id": "F007",
+      "title": "Covariance Calculation",
+      "description": "Implement covariance matrix calculation for uncertainty estimation",
+      "priority": "medium",
+      "status": "not_started",
+      "phase": 3
+    },
+    {
+      "id": "F008",
+      "title": "Confidence Intervals",
+      "description": "Calculate parameter confidence intervals from covariance matrix",
+      "priority": "medium",
+      "status": "not_started",
+      "phase": 3
+    },
+    {
+      "id": "F009",
+      "title": "Monte Carlo Methods",
+      "description": "Implement Monte Carlo method for uncertainty propagation",
+      "priority": "low",
+      "status": "not_started",
+      "phase": 3
+    },
+    {
+      "id": "F010",
+      "title": "Base Model System",
+      "description": "Create base model trait and implementation",
+      "priority": "medium",
+      "status": "not_started",
+      "phase": 4
+    },
+    {
+      "id": "F011",
+      "title": "Built-in Models",
+      "description": "Implement built-in models (Gaussian, Lorentzian, etc.)",
+      "priority": "low",
+      "status": "not_started",
+      "phase": 4
+    },
+    {
+      "id": "F012",
+      "title": "Global Optimization",
+      "description": "Add global optimization methods",
+      "priority": "low",
+      "status": "not_started",
+      "phase": 5
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "Setup project structure",
+      "description": "Create initial project structure and directory layout",
+      "priority": "high",
+      "status": "completed",
+      "feature_id": null
+    },
+    {
+      "id": "T002",
+      "title": "Create faer-ndarray conversions",
+      "description": "Implement conversion functions between faer and ndarray",
+      "priority": "high",
+      "status": "not_started",
+      "feature_id": "F001"
+    },
+    {
+      "id": "T003",
+      "title": "Create faer-nalgebra conversions",
+      "description": "Implement conversion functions between faer and nalgebra",
+      "priority": "high",
+      "status": "not_started",
+      "feature_id": "F001"
+    },
+    {
+      "id": "T004",
+      "title": "Create Problem trait",
+      "description": "Define Problem trait compatible with levenberg-marquardt",
+      "priority": "high",
+      "status": "not_started",
+      "feature_id": "F002"
+    },
+    {
+      "id": "T005",
+      "title": "Implement core LM algorithm",
+      "description": "Implement basic Levenberg-Marquardt algorithm",
+      "priority": "high",
+      "status": "not_started",
+      "feature_id": "F003"
+    },
+    {
+      "id": "T006",
+      "title": "Add trust region support",
+      "description": "Implement trust region variant of LM algorithm",
+      "priority": "medium",
+      "status": "not_started",
+      "feature_id": "F003"
+    },
+    {
+      "id": "T007",
+      "title": "Implement parameter bounds",
+      "description": "Add support for parameter bounds (min/max)",
+      "priority": "medium",
+      "status": "not_started",
+      "feature_id": "F004"
+    }
+  ]
+}
