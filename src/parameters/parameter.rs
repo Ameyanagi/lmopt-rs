@@ -244,9 +244,27 @@ impl Parameter {
     
     /// Set the name of the parameter
     ///
+    /// This method updates the parameter's name. This is particularly useful when
+    /// creating parameters for composite models or when parameters need to be 
+    /// renamed to avoid naming conflicts in parameter collections.
+    ///
     /// # Arguments
     ///
     /// * `name` - The new name for the parameter
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use lmopt_rs::parameters::parameter::Parameter;
+    ///
+    /// // Create a parameter with an initial name
+    /// let mut param = Parameter::new("amplitude", 10.0);
+    /// assert_eq!(param.name(), "amplitude");
+    ///
+    /// // Change the parameter name
+    /// param.set_name("model1_amplitude");
+    /// assert_eq!(param.name(), "model1_amplitude");
+    /// ```
     pub fn set_name(&mut self, name: &str) {
         self.name = name.to_string();
     }

@@ -194,21 +194,87 @@ pub fn monte_carlo_covariance(
 
 /// Performs Monte Carlo analysis by repeatedly solving the problem with synthetic data.
 /// 
-/// This method generates synthetic data by adding noise to the best-fit model prediction,
-/// then refits the model to estimate parameter distributions.
+/// This method implements the Monte Carlo method for uncertainty analysis by:
+/// 1. Generating synthetic data sets by adding random noise to the best-fit predictions
+/// 2. Refitting the model to each synthetic data set
+/// 3. Analyzing the distribution of resulting parameters
+///
+/// This approach is more robust than covariance-based methods for nonlinear models,
+/// models with parameter bounds, or non-Gaussian parameter distributions. It directly
+/// samples the parameter space around the best fit and can capture asymmetric confidence
+/// intervals and parameter correlations.
 /// 
 /// # Arguments
 /// 
-/// * `problem` - The problem to analyze (must implement ParameterProblem trait)
-/// * `params` - Best-fit parameters
-/// * `residuals` - Residuals from the best fit
+/// * `problem` - The problem to analyze, implementing both `ParameterProblem` and
+///   `GlobalOptimizer` traits to support parameter-based optimization
+/// * `params` - Best-fit parameters from an initial optimization
+/// * `residuals` - Residuals from the best fit, used to estimate noise level
 /// * `n_samples` - Number of Monte Carlo samples to generate
-/// * `percentiles` - Percentiles for confidence intervals
-/// * `rng` - Random number generator
+/// * `percentiles` - Percentiles for confidence intervals (e.g., [0.68, 0.95])
+/// * `rng` - Random number generator for noise generation
 /// 
 /// # Returns
 /// 
-/// * `MonteCarloResult` - The results of the Monte Carlo analysis
+/// * `MonteCarloResult` - The results of the Monte Carlo analysis containing
+///   parameter distributions, statistics, and confidence intervals
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use lmopt_rs::uncertainty::{monte_carlo_refit, propagate_uncertainty};
+/// use lmopt_rs::parameters::Parameters;
+/// use lmopt_rs::problem_params::ParameterProblem;
+/// use lmopt_rs::global_opt::GlobalOptimizer;
+/// use ndarray::Array1;
+/// use rand::SeedableRng;
+/// use rand_chacha::ChaCha8Rng;
+/// use std::collections::HashMap;
+///
+/// // A struct implementing both ParameterProblem and GlobalOptimizer
+/// struct MyProblem { /* ... */ }
+/// impl ParameterProblem for MyProblem { /* ... */ }
+/// impl GlobalOptimizer for MyProblem { /* ... */ }
+///
+/// // After performing an initial fit:
+/// let mut problem = MyProblem { /* ... */ };
+/// let best_fit_params = problem.parameters().clone();
+/// let residuals = Array1::from_vec(vec![/* residuals from best fit */]);
+///
+/// // Set up RNG and percentiles
+/// let mut rng = ChaCha8Rng::seed_from_u64(42);
+/// let percentiles = vec![0.68, 0.95]; // 1σ and 2σ confidence levels
+///
+/// // Perform Monte Carlo analysis
+/// let mc_result = monte_carlo_refit(
+///     &mut problem,
+///     &best_fit_params,
+///     &residuals,
+///     1000,       // number of samples
+///     &percentiles,
+///     &mut rng
+/// ).unwrap();
+///
+/// // Analyze the results
+/// for (param_name, param_std) in &mc_result.stds {
+///     println!("Parameter {}: std = {}", param_name, param_std);
+///     
+///     // Print confidence intervals
+///     for (percentile, (lower, upper)) in &mc_result.percentiles[param_name] {
+///         println!("  {} confidence: [{}, {}]", percentile, lower, upper);
+///     }
+/// }
+///
+/// // Propagate uncertainty to a derived quantity
+/// let derived_function = |params: &HashMap<String, f64>| {
+///     params["amplitude"] * params["center"].powf(2.0)
+/// };
+///
+/// let (values, mean, std_dev, median, derived_percentiles) = 
+///     propagate_uncertainty(&mc_result, derived_function, &percentiles);
+///
+/// println!("Derived quantity: mean = {}, std = {}", mean, std_dev);
+/// ```
 pub fn monte_carlo_refit<P: crate::problem_params::ParameterProblem + crate::global_opt::GlobalOptimizer>(
     problem: &mut P,
     params: &Parameters,
