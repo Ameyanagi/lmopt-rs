@@ -29,10 +29,13 @@ mod utils;
 pub mod problem;
 
 #[cfg(feature = "lm")]
+pub mod problem_params;
+
+#[cfg(feature = "lm")]
 pub mod lm;
 
 #[cfg(feature = "lm")]
-mod uncertainty;
+pub mod uncertainty;
 
 #[cfg(feature = "lm")]
 pub mod model;
@@ -48,6 +51,24 @@ pub use lm::LevenbergMarquardt;
 
 #[cfg(feature = "lm")]
 pub use problem::Problem;
+
+#[cfg(feature = "lm")]
+pub use problem_params::ParameterProblem;
+
+#[cfg(feature = "lm")]
+pub use uncertainty::{
+    UncertaintyCalculator, 
+    UncertaintyResult, 
+    ConfidenceInterval,
+    MonteCarloResult,
+    covariance_matrix, 
+    standard_errors,
+    uncertainty_analysis,
+    uncertainty_analysis_with_monte_carlo,
+    monte_carlo_covariance,
+    monte_carlo_refit,
+    propagate_uncertainty,
+};
 
 /// Version of the library
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

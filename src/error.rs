@@ -23,6 +23,10 @@ pub enum LmOptError {
     #[error("Invalid parameter value: {0}")]
     InvalidParameter(String),
     
+    /// Error for parameter-related problems.
+    #[error("Parameter error: {0}")]
+    ParameterError(String),
+    
     /// Error for boundary constraint violations.
     #[error("Bounds error: {0}")]
     BoundsError(String),
@@ -30,6 +34,10 @@ pub enum LmOptError {
     /// Error during function evaluation.
     #[error("Function evaluation error: {0}")]
     FunctionEvaluation(String),
+    
+    /// Error during computational operations.
+    #[error("Computation error: {0}")]
+    InvalidComputation(String),
     
     /// I/O error wrapper.
     #[error("IO error: {0}")]
@@ -42,6 +50,13 @@ pub enum LmOptError {
     /// Generic error for cases that don't fit the other categories.
     #[error("Error: {0}")]
     Other(String),
+}
+
+// Add From implementation for ParameterError
+impl From<crate::parameters::parameter::ParameterError> for LmOptError {
+    fn from(err: crate::parameters::parameter::ParameterError) -> Self {
+        LmOptError::ParameterError(format!("{}", err))
+    }
 }
 
 /// Result type alias for lmopt-rs operations.
