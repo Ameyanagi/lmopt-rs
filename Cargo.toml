@@ -1,0 +1,52 @@
+[package]
+name = "lmopt-rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ameyanagi"]
+description = "A Rust implementation of the Levenberg-Marquardt algorithm with uncertainty calculation"
+license = "MIT"
+readme = "README.md"
+keywords = ["optimization", "levenberg-marquardt", "curve-fitting", "least-squares"]
+categories = ["mathematics", "science", "algorithms"]
+# Use the latest stable Rust version
+rust-version = "1.75"
+
+[dependencies]
+# Linear algebra libraries
+faer = { version = "0.22", optional = true }
+faer-ext = { version = "0.6", features = ["ndarray"], optional = true }
+ndarray = "0.15"
+nalgebra = { version = "0.32", optional = true }  # For compatibility with levenberg-marquardt
+
+# Error handling
+thiserror = "1.0"
+
+# Random number generation (for Monte Carlo methods)
+rand = "0.8"
+
+# Serialization/deserialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Expression parsing and evaluation
+nom = "8.0.0"
+
+# Optional dependencies
+levenberg-marquardt = { version = "0.8", optional = true }  # For compatibility features
+
+# Autodiff support will be added when Rust's autodiff APIs stabilize
+# Currently using finite differences as fallback
+
+[dev-dependencies]
+# Testing utilities
+approx = "0.5"
+criterion = "0.5"  # For benchmarking
+levenberg-marquardt = "0.8"  # For testing
+
+[features]
+default = ["matrix", "lm"]
+matrix = ["dep:faer", "dep:faer-ext", "dep:nalgebra"]
+lm = ["matrix"]
+lm-compat = ["dep:levenberg-marquardt", "matrix"]  # Feature for levenberg-marquardt compatibility
+autodiff = []  # Feature flag for autodiff when it becomes available
+parameters = []  # Just the parameter system

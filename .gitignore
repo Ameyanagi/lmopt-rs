@@ -1,0 +1,30 @@
+# Generated files
+/target/
+
+# Remove lockfiles
+Cargo.lock
+
+# Backup files
+**/*.rs.bk
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Reference implementations (embedded git repositories)
+/levenberg-marquardt/
+/lmfit-py/
+
+# Temporary files
+*.tmp
+*.temp
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Other parent directory content that might be accidentally added
+/.*/
+../*/
