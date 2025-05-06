@@ -59,7 +59,7 @@ pub fn ndarray_to_faer<T: NumericScalar>(arr: &Array2<T>) -> Result<Mat<T>> {
 ///
 /// # Arguments
 ///
-/// * `mat` - The faer Mat to convert
+/// * `mat` - The faer Mat or MatRef to convert
 ///
 /// # Returns
 ///

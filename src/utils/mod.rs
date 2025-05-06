@@ -10,6 +10,8 @@ pub use matrix_convert::{
     ndarray_vec_to_faer, faer_vec_to_ndarray,
     nalgebra_to_faer, faer_to_nalgebra,
     nalgebra_to_ndarray, ndarray_to_nalgebra,
+    nalgebra_vec_to_faer, faer_vec_to_nalgebra,
+    nalgebra_vec_to_ndarray, ndarray_vec_to_nalgebra,
 };
 
 // Prefer autodiff implementations when available, with finite_difference as fallback
