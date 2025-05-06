@@ -13,7 +13,7 @@ Cargo.lock
 *.swp
 *.swo
 
-# Reference implementations (embedded git repositories)
+# Reference implementations (exclude embedded git repositories)
 /levenberg-marquardt/
 /lmfit-py/
 
@@ -25,6 +25,36 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 
-# Other parent directory content that might be accidentally added
-/.*/
-../*/
+# Avoid including other repositories
+**/.git/
+**/.gitmodules
+
+# Never include files from parent or sibling directories
+../
+/..
+
+# Python environment
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Exclude benchmark data that shouldn't be in the repo
+/bench_results/
+/perf_data/
