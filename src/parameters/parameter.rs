@@ -242,6 +242,15 @@ impl Parameter {
         &self.name
     }
     
+    /// Set the name of the parameter
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The new name for the parameter
+    pub fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
+    
     /// Check if the parameter is varied during optimization
     ///
     /// # Returns
@@ -308,6 +317,32 @@ impl Parameter {
         self.value = bounds.clamp(self.value);
         
         Ok(())
+    }
+    
+    /// Set the minimum bound for the parameter
+    ///
+    /// # Arguments
+    ///
+    /// * `min` - Minimum allowed value for the parameter
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if the bound was set successfully
+    pub fn set_min(&mut self, min: f64) -> Result<(), ParameterError> {
+        self.set_bounds(min, self.bounds.max)
+    }
+    
+    /// Set the maximum bound for the parameter
+    ///
+    /// # Arguments
+    ///
+    /// * `max` - Maximum allowed value for the parameter
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if the bound was set successfully
+    pub fn set_max(&mut self, max: f64) -> Result<(), ParameterError> {
+        self.set_bounds(self.bounds.min, max)
     }
     
     /// Get the expression used to compute this parameter (if any)

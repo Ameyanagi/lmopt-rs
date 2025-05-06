@@ -199,7 +199,7 @@ pub fn monte_carlo_covariance(
 /// 
 /// # Arguments
 /// 
-/// * `problem` - The problem to analyze
+/// * `problem` - The problem to analyze (must implement ParameterProblem trait)
 /// * `params` - Best-fit parameters
 /// * `residuals` - Residuals from the best fit
 /// * `n_samples` - Number of Monte Carlo samples to generate
@@ -209,15 +209,17 @@ pub fn monte_carlo_covariance(
 /// # Returns
 /// 
 /// * `MonteCarloResult` - The results of the Monte Carlo analysis
-#[cfg(feature = "lm")]
-pub fn monte_carlo_refit<P: Problem>(
-    _problem: &P,
+pub fn monte_carlo_refit<P: crate::problem_params::ParameterProblem + crate::global_opt::GlobalOptimizer>(
+    problem: &mut P,
     params: &Parameters,
     residuals: &Array1<f64>,
     n_samples: usize,
     percentiles: &[f64],
     rng: &mut impl Rng,
 ) -> Result<MonteCarloResult> {
+    use crate::problem_params::ParameterProblem;
+    use crate::global_opt::GlobalOptimizer;
+    
     // Get the varying parameters
     let varying_params = params.varying();
     let n_params = varying_params.len();
@@ -233,9 +235,6 @@ pub fn monte_carlo_refit<P: Problem>(
     let residual_std = (residuals.iter().map(|&r| r.powi(2)).sum::<f64>() 
         / (n_data - n_params) as f64).sqrt();
     
-    // Create LM solver
-    let _lm = LevenbergMarquardt::with_default_config();
-    
     // Generate parameter sets by refitting with synthetic data
     let mut param_sets = Vec::with_capacity(n_samples);
     let param_names: Vec<String> = varying_params.iter()
@@ -249,38 +248,66 @@ pub fn monte_carlo_refit<P: Problem>(
     // Create a normal distribution for noise generation
     let normal = Normal::new(0.0, residual_std).unwrap();
     
-    // Create temporary problem with synthetic data for each MC iteration
-    // (This would be implementation-dependent, for now we'll include a placeholder method)
+    // Evaluate the model using the best-fit parameters to get the predicted values
+    let y_pred = problem.evaluate_model(params)?;
     
-    // For a real implementation, we would:
-    // 1. Get the original data (x, y) from the problem
-    // 2. Calculate the best-fit model y_fit = f(x, params)
-    // 3. Add random noise to create synthetic data: y_synth = y_fit + noise
-    // 4. Create a new problem with (x, y_synth)
-    // 5. Refit the model to get new parameter estimates
-    // 6. Store the parameter values
-    
-    // For demonstration purposes, we'll generate random parameter variations
-    // This should be replaced with actual refitting in a real implementation
-    for _ in 0..n_samples {
-        let mut new_params = HashMap::new();
-        
-        for param in varying_params.iter() {
-            let param_name = param.name().to_string();
-            let value = param.value() + normal.sample(rng);
-            
-            // Apply parameter bounds
-            let min_val = param.min();
-            let max_val = param.max();
-            
-            // Apply bounds - if min/max are -/+ infinity they won't affect the value
-            let bounded_value = value.max(min_val).min(max_val);
-            
-            new_params.insert(param_name.clone(), bounded_value);
-            all_samples.get_mut(&param_name).unwrap().push(bounded_value);
+    // For each Monte Carlo iteration:
+    // 1. Generate synthetic data by adding noise to the best-fit predictions
+    // 2. Create a new problem with the synthetic data
+    // 3. Fit the model to the synthetic data
+    // 4. Store the resulting parameter values
+    for sample_i in 0..n_samples {
+        // Generate synthetic data by adding noise to the best-fit model predictions
+        let mut y_synth = y_pred.clone();
+        for i in 0..y_synth.len() {
+            y_synth[i] += normal.sample(rng);
         }
         
-        param_sets.push(new_params);
+        // Set the synthetic data in the problem
+        problem.set_data(&y_synth)?;
+        
+        // Initialize the optimization with the best-fit parameters
+        // This improves convergence speed and stability
+        problem.initialize_parameters(params)?;
+        
+        // Fit the model to the synthetic data
+        // Call the optimize_param_problem method
+        if let Ok(_) = problem.optimize_param_problem(10000, 100, 1e-8) {
+            // After optimization, use the updated parameters
+            let optimized_params = problem.parameters().clone();
+            
+            // Extract parameter values from the fit
+            let mut new_params = HashMap::new();
+            
+            for param_name in &param_names {
+                if let Some(param) = optimized_params.get(param_name) {
+                    let value = param.value();
+                    new_params.insert(param_name.clone(), value);
+                    all_samples.get_mut(param_name).unwrap().push(value);
+                }
+            }
+            
+            param_sets.push(new_params);
+        } else {
+            // Optimization failed, report but continue with other samples
+            eprintln!("Monte Carlo iteration {} failed", sample_i);
+            // Continue with the next sample
+            continue;
+        }
+    }
+    
+    // Check if we have enough successful samples
+    if param_sets.len() < n_samples / 2 {
+        // If more than half of the optimizations failed, return an error
+        return Err(LmOptError::InvalidComputation(
+            format!("Too many Monte Carlo iterations failed: only {} of {} succeeded",
+                    param_sets.len(), n_samples)
+        ));
+    } else if param_sets.len() < n_samples {
+        // If some optimizations failed but we still have a substantial number,
+        // just warn the user and continue
+        eprintln!("Warning: {} of {} Monte Carlo iterations failed",
+                 n_samples - param_sets.len(), n_samples);
     }
     
     // Calculate statistics from the Monte Carlo samples
@@ -292,6 +319,12 @@ pub fn monte_carlo_refit<P: Problem>(
     
     for param_name in param_names {
         let samples = all_samples.get_mut(&param_name).unwrap();
+        
+        // If no successful samples for this parameter, skip it
+        if samples.is_empty() {
+            continue;
+        }
+        
         samples.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         
         // Calculate mean
@@ -316,8 +349,8 @@ pub fn monte_carlo_refit<P: Problem>(
         // Calculate percentiles
         let mut param_percentiles = Vec::new();
         for &p in percentiles {
-            let lower_idx = ((n_samples as f64) * ((1.0 - p) / 2.0)).round() as usize;
-            let upper_idx = ((n_samples as f64) * (1.0 - (1.0 - p) / 2.0)).round() as usize;
+            let lower_idx = ((samples.len() as f64) * ((1.0 - p) / 2.0)).round() as usize;
+            let upper_idx = ((samples.len() as f64) * (1.0 - (1.0 - p) / 2.0)).round() as usize;
             
             let lower = samples[lower_idx.min(samples.len() - 1)];
             let upper = samples[upper_idx.min(samples.len() - 1)];

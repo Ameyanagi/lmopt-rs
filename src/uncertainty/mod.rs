@@ -163,9 +163,9 @@ impl UncertaintyCalculator {
     
     /// Perform Monte Carlo uncertainty analysis by refitting with synthetic data
     #[cfg(feature = "lm")]
-    pub fn monte_carlo_refit_analysis<P: crate::problem::Problem>(
+    pub fn monte_carlo_refit_analysis<P: crate::problem_params::ParameterProblem + crate::global_opt::GlobalOptimizer>(
         &self,
-        problem: &P,
+        problem: &mut P,  // Changed to &mut to match monte_carlo_refit's signature
         params: &Parameters,
         residuals: &Array1<f64>,
         n_samples: usize,
