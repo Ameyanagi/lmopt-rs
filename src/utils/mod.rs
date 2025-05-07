@@ -3,6 +3,7 @@
 pub mod autodiff;
 pub mod finite_difference;
 pub mod matrix_convert;
+pub mod parallel;
 
 // Re-export commonly used utilities
 pub use matrix_convert::{
@@ -13,3 +14,9 @@ pub use matrix_convert::{
 
 // Prefer autodiff implementations when available, with finite_difference as fallback
 pub use autodiff::{gradient, hessian, jacobian};
+
+// Parallel implementations
+pub use parallel::{
+    eval_residuals_parallel, gradient_parallel, hessian_parallel, jacobian_central_parallel,
+    jacobian_parallel,
+};

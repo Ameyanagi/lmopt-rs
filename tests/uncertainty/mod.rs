@@ -1,5 +1,10 @@
 // Tests for uncertainty calculations
 
+mod confidence_intervals_tests;
+mod model_fit_uncertainties_test;
+mod monte_carlo_tests;
+mod uncertainty_calculator_tests;
+
 #[cfg(test)]
 mod tests {
     use lmopt_rs::parameters::{Parameter, Parameters};
@@ -109,9 +114,8 @@ mod tests {
         assert_eq!(result.correlation.shape(), &[2, 2]);
         assert!(result.standard_errors.contains_key("m"));
         assert!(result.standard_errors.contains_key("b"));
-
-        // Confidence intervals not fully implemented yet, but should at least be an empty map
-        assert!(result.confidence_intervals.is_empty());
+        assert!(result.confidence_intervals.contains_key("m"));
+        assert!(result.confidence_intervals.contains_key("b"));
     }
 
     #[test]

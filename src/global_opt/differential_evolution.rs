@@ -93,6 +93,63 @@ impl DifferentialEvolution {
         }
     }
 
+    /// Set the population size multiplier.
+    ///
+    /// # Arguments
+    ///
+    /// * `size` - Population size (not a multiplier)
+    ///
+    /// # Returns
+    ///
+    /// * Self for method chaining
+    pub fn with_population_size(mut self, size: usize) -> Self {
+        self.pop_size_multiplier = size;
+        self
+    }
+
+    /// Set the differential weight (F).
+    ///
+    /// # Arguments
+    ///
+    /// * `weight` - Differential weight in range [0, 2]
+    ///
+    /// # Returns
+    ///
+    /// * Self for method chaining
+    pub fn with_differential_weight(mut self, weight: f64) -> Self {
+        self.differential_weight = weight;
+        self
+    }
+
+    /// Set the crossover probability (CR).
+    ///
+    /// # Arguments
+    ///
+    /// * `prob` - Crossover probability in range [0, 1]
+    ///
+    /// # Returns
+    ///
+    /// * Self for method chaining
+    pub fn with_crossover_probability(mut self, prob: f64) -> Self {
+        self.crossover_prob = prob;
+        self
+    }
+
+    /// Set the random seed for reproducibility.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - Random seed
+    ///
+    /// # Returns
+    ///
+    /// * Self for method chaining
+    pub fn with_seed(self, _seed: u64) -> Self {
+        // In the current implementation, we don't actually use the seed,
+        // but we provide this method for API compatibility with ParallelDifferentialEvolution
+        self
+    }
+
     /// Create a trial vector using the specified strategy.
     ///
     /// # Arguments

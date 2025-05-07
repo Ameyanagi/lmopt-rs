@@ -110,7 +110,7 @@ impl BasinHopping {
         }
 
         // Create local optimizer
-        let local_optimizer = LevenbergMarquardt::new(self.local_config.clone());
+        let local_optimizer = LevenbergMarquardt::with_config(self.local_config.clone());
 
         // Run local optimization on the initial guess
         let mut current_params = initial_params.clone();

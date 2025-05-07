@@ -33,7 +33,19 @@
       "Bash(sed:*)",
       "Bash(cp:*)",
       "Bash(python3:*)",
-      "Bash(rustc:*)"
+      "Bash(rustc:*)",
+      "Bash(git -C /home/ryuichi/rust/lmopt-rs status)",
+      "Bash(git -C /home/ryuichi/rust/lmopt-rs add README.md docs/ .github/ .nojekyll src/lib.rs src/parameters/mod.rs src/model.rs src/uncertainty/mod.rs src/global_opt/mod.rs src/lm/)",
+      "Bash(git -C /home/ryuichi/rust/lmopt-rs commit -m \"Add comprehensive documentation and GitHub Pages workflow\")",
+      "Bash(git -C /home/ryuichi/rust/lmopt-rs add .pre-commit-config.yaml)",
+      "Bash(git -C /home/ryuichi/rust/lmopt-rs reset)",
+      "Bash(git -C /home/ryuichi/rust/lmopt-rs add README.md docs/ .github/ .nojekyll)",
+      "Bash(git -C /home/ryuichi/rust/lmopt-rs add src/lib.rs src/parameters/mod.rs src/model.rs src/uncertainty/mod.rs src/global_opt/mod.rs src/lm/mod.rs)",
+      "Bash(./uncertainty_standalone)",
+      "Bash(cargo:*)",
+      "Bash(./constraints_test)",
+      "Bash(./constraint_test)",
+      "Bash(./constraint_type_test)"
     ],
     "deny": []
   }

@@ -2,6 +2,15 @@
 
 This guide demonstrates how to perform basic curve fitting with `lmopt-rs`. We'll cover several common scenarios, from simple function fitting to more complex models with bounds and constraints.
 
+## Related Documentation
+- [Getting Started Guide](../getting_started.md)
+- [Parameter System](../concepts/parameters.md)
+- [Model System](../concepts/models.md)
+- [Levenberg-Marquardt Algorithm](../concepts/lm_algorithm.md)
+- [Uncertainty Analysis](../concepts/uncertainty.md)
+- [Composite Models](./composite_models.md) - For more advanced model examples
+- [Global Optimization](./global_optimization.md) - For complex fitting scenarios
+
 ## Simple Function Fitting
 
 Let's start with a basic example: fitting a quadratic function to data points.
@@ -460,4 +469,318 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-These examples demonstrate the versatility and power of `lmopt-rs` for various fitting applications. For more advanced usage, check the other example documentation.
+## Advanced Parameter Expressions
+
+You can use parameter expressions to define derived parameters that are calculated from other parameters:
+
+```rust
+use lmopt_rs::model::{fit, BaseModel, Model};
+use lmopt_rs::parameters::Parameters;
+use ndarray::Array1;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create data for a Gaussian peak
+    let x = Array1::linspace(-5.0, 5.0, 100);
+    let y = x.iter().map(|&x| {
+        // Gaussian with amplitude=3.0, center=0.0, sigma=1.0
+        let true_value = 3.0 * (-0.5 * x.powi(2)).exp();
+        let noise = rand::random::<f64>() * 0.1 - 0.05;
+        true_value + noise
+    }).collect::<Vec<f64>>();
+    let y = Array1::from_vec(y);
+    
+    // Create parameters with expressions
+    let mut params = Parameters::new();
+    
+    // Basic parameters
+    params.add_param_with_bounds("amplitude", 2.0, 0.0, 10.0)?;
+    params.add_param("center", 0.0)?;
+    params.add_param_with_bounds("sigma", 0.8, 0.1, 5.0)?;
+    
+    // Derived parameters using expressions
+    // FWHM = 2.355 * sigma (Full width at half maximum)
+    params.add_param_with_expr("fwhm", 0.0, "2.355 * sigma")?;
+    
+    // Area = amplitude * sigma * sqrt(2*pi)
+    params.add_param_with_expr("area", 0.0, "amplitude * sigma * sqrt(2*pi)")?;
+    
+    // Height at peak = amplitude
+    params.add_param_with_expr("height", 0.0, "amplitude")?;
+    
+    // Create the model
+    let model_fn = |params: &Parameters, x: &Array1<f64>| {
+        let amplitude = params.get("amplitude").unwrap().value();
+        let center = params.get("center").unwrap().value();
+        let sigma = params.get("sigma").unwrap().value();
+        
+        let result = x.iter()
+            .map(|&x_val| {
+                let arg = (x_val - center) / sigma;
+                amplitude * (-0.5 * arg * arg).exp()
+            })
+            .collect::<Vec<f64>>();
+            
+        Ok(Array1::from_vec(result))
+    };
+    
+    let mut model = BaseModel::new(params, model_fn);
+    
+    // Fit the model
+    let result = fit(&mut model, x.clone(), y.clone())?;
+    
+    // Print results including derived parameters
+    println!("Fit successful: {}", result.success);
+    println!("Basic Parameters:");
+    println!("  Amplitude: {:.4}", model.parameters().get("amplitude").unwrap().value());
+    println!("  Center: {:.4}", model.parameters().get("center").unwrap().value());
+    println!("  Sigma: {:.4}", model.parameters().get("sigma").unwrap().value());
+    
+    println!("\nDerived Parameters:");
+    println!("  FWHM: {:.4}", model.parameters().get("fwhm").unwrap().value());
+    println!("  Area: {:.4}", model.parameters().get("area").unwrap().value());
+    println!("  Height: {:.4}", model.parameters().get("height").unwrap().value());
+    
+    println!("\nTrue parameters: amplitude=3.0, center=0.0, sigma=1.0");
+    println!("True derived: fwhm=2.355, area=7.525, height=3.0");
+    
+    Ok(())
+}
+```
+
+## Monte Carlo Uncertainty Analysis
+
+For more robust uncertainty estimation, you can use Monte Carlo methods:
+
+```rust
+use lmopt_rs::model::{fit, Model};
+use lmopt_rs::models::GaussianModel;
+use lmopt_rs::uncertainty::uncertainty_analysis_with_monte_carlo;
+use ndarray::Array1;
+use rand::{SeedableRng, Rng};
+use rand_chacha::ChaCha8Rng;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create data for a Gaussian peak
+    let x = Array1::linspace(-5.0, 5.0, 100);
+    let y = x.iter().map(|&x| {
+        // Gaussian with amplitude=3.0, center=0.0, sigma=1.0
+        let true_value = 3.0 * (-0.5 * x.powi(2)).exp();
+        let noise = rand::thread_rng().gen_range(-0.2..0.2);
+        true_value + noise
+    }).collect::<Vec<f64>>();
+    let y = Array1::from_vec(y);
+    
+    // Create and fit the model
+    let mut model = GaussianModel::new("", false);
+    let result = fit(&mut model, x.clone(), y.clone())?;
+    
+    // Create a seeded RNG for reproducibility
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    
+    // Perform Monte Carlo uncertainty analysis
+    let mc_result = uncertainty_analysis_with_monte_carlo(
+        &model,
+        &result,
+        1000,       // Number of Monte Carlo samples
+        &mut rng
+    )?;
+    
+    // Print results
+    println!("Fit Results:");
+    println!("  Amplitude: {:.4}", model.parameters().get("amplitude").unwrap().value());
+    println!("  Center: {:.4}", model.parameters().get("center").unwrap().value());
+    println!("  Sigma: {:.4}", model.parameters().get("sigma").unwrap().value());
+    
+    println!("\nMonte Carlo Statistics:");
+    for (name, dist) in &mc_result.parameter_distributions {
+        println!("Parameter: {}", name);
+        println!("  Mean: {:.4}", dist.mean());
+        println!("  Std Dev: {:.4}", dist.std_dev());
+        println!("  95% CI: [{:.4}, {:.4}]", 
+                dist.percentile(2.5), dist.percentile(97.5));
+    }
+    
+    // Check for parameter correlations
+    println!("\nParameter Correlations:");
+    println!("  Amplitude-Center: {:.4}", 
+             mc_result.parameter_correlation("amplitude", "center").unwrap_or(0.0));
+    println!("  Amplitude-Sigma: {:.4}", 
+             mc_result.parameter_correlation("amplitude", "sigma").unwrap_or(0.0));
+    println!("  Center-Sigma: {:.4}", 
+             mc_result.parameter_correlation("center", "sigma").unwrap_or(0.0));
+    
+    Ok(())
+}
+```
+
+## Curve Fitting with Predefined Step Functions
+
+Here's an example of fitting a step-like function to data:
+
+```rust
+use lmopt_rs::model::{fit, Model};
+use lmopt_rs::models::StepModel;
+use ndarray::Array1;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create data for a step function
+    let x = Array1::linspace(-5.0, 5.0, 100);
+    let y = x.iter().map(|&x| {
+        // Step function with amplitude=2.0, center=0.0, sigma=0.5 (transition width)
+        let true_value = 1.0 + 2.0 / (1.0 + (-(x - 0.0) / 0.5).exp());
+        let noise = rand::random::<f64>() * 0.1 - 0.05;
+        true_value + noise
+    }).collect::<Vec<f64>>();
+    let y = Array1::from_vec(y);
+    
+    // Create a step model
+    let mut model = StepModel::new("", true);  // Empty prefix, with baseline
+    
+    // Set initial guesses
+    model.parameters_mut().get_mut("amplitude").unwrap().set_value(1.5)?;
+    model.parameters_mut().get_mut("center").unwrap().set_value(0.5)?;
+    model.parameters_mut().get_mut("sigma").unwrap().set_value(1.0)?;
+    model.parameters_mut().get_mut("baseline").unwrap().set_value(0.8)?;
+    
+    // Fit the model
+    let result = fit(&mut model, x.clone(), y.clone())?;
+    
+    // Print results
+    println!("Fit successful: {}", result.success);
+    println!("Parameters:");
+    println!("  Amplitude: {:.4}", model.parameters().get("amplitude").unwrap().value());
+    println!("  Center: {:.4}", model.parameters().get("center").unwrap().value());
+    println!("  Sigma: {:.4}", model.parameters().get("sigma").unwrap().value());
+    println!("  Baseline: {:.4}", model.parameters().get("baseline").unwrap().value());
+    println!("Cost: {:.6}", result.cost);
+    
+    println!("\nTrue parameters: amplitude=2.0, center=0.0, sigma=0.5, baseline=1.0");
+    
+    // Analyze residuals
+    let residuals = model.residuals(&x, &y)?;
+    let rms_error = (residuals.iter().map(|r| r.powi(2)).sum::<f64>() / residuals.len() as f64).sqrt();
+    println!("RMS Error: {:.6}", rms_error);
+    
+    Ok(())
+}
+```
+
+## Fitting with Weighted Data
+
+Sometimes, data points have different uncertainties. Here's how to implement weighted fitting:
+
+```rust
+use lmopt_rs::{LevenbergMarquardt, Problem};
+use ndarray::{array, Array1, Array2, ArrayView1};
+
+// Define a weighted problem
+struct WeightedProblem {
+    x_data: Array1<f64>,
+    y_data: Array1<f64>,
+    weights: Array1<f64>,  // Weights for each data point
+}
+
+impl Problem for WeightedProblem {
+    fn eval(&self, params: &Array1<f64>) -> lmopt_rs::Result<Array1<f64>> {
+        // Linear model: y = m*x + c
+        let m = params[0];
+        let c = params[1];
+        
+        // Calculate weighted residuals: (model - data) * sqrt(weight)
+        let residuals = self.x_data.iter()
+            .zip(self.y_data.iter())
+            .zip(self.weights.iter())
+            .map(|((&x, &y), &w)| {
+                let model = m * x + c;
+                (model - y) * w.sqrt()  // Apply weight to residual
+            })
+            .collect::<Vec<f64>>();
+            
+        Ok(Array1::from_vec(residuals))
+    }
+    
+    fn parameter_count(&self) -> usize {
+        2  // m, c (slope and intercept)
+    }
+    
+    fn residual_count(&self) -> usize {
+        self.x_data.len()
+    }
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create data with varying uncertainties
+    let x = Array1::linspace(0.0, 10.0, 50);
+    let mut rng = rand::thread_rng();
+    
+    // Generate y values with different noise levels
+    let mut y = Array1::zeros(50);
+    let mut weights = Array1::zeros(50);
+    
+    for i in 0..50 {
+        let x_val = x[i];
+        
+        // True linear model: y = 2*x + 1
+        let true_y = 2.0 * x_val + 1.0;
+        
+        // Different uncertainty for different regions
+        let uncertainty = if x_val < 3.0 {
+            0.5  // High uncertainty
+        } else if x_val < 7.0 {
+            0.2  // Medium uncertainty
+        } else {
+            0.1  // Low uncertainty
+        };
+        
+        // Add noise proportional to uncertainty
+        let noise = rng.gen_range(-uncertainty..uncertainty);
+        y[i] = true_y + noise;
+        
+        // Weight is inversely proportional to variance
+        weights[i] = 1.0 / (uncertainty * uncertainty);
+    }
+    
+    // Create our weighted problem
+    let problem = WeightedProblem {
+        x_data: x.clone(),
+        y_data: y.clone(),
+        weights: weights.clone(),
+    };
+    
+    // Create the optimizer
+    let mut optimizer = LevenbergMarquardt::with_default_config();
+    
+    // Set initial parameter guess [m, c]
+    let initial_params = array![1.0, 0.0];
+    
+    // Run the optimization
+    let result = optimizer.minimize(&problem, initial_params)?;
+    
+    // Print results
+    println!("Weighted fit successful: {}", result.success);
+    println!("Parameters:");
+    println!("  Slope (m): {:.4}", result.params[0]);
+    println!("  Intercept (c): {:.4}", result.params[1]);
+    println!("Cost: {:.6}", result.cost);
+    
+    // Compare with unweighted fit
+    let unweighted_problem = WeightedProblem {
+        x_data: x.clone(),
+        y_data: y.clone(),
+        weights: Array1::ones(50),  // Equal weights
+    };
+    
+    let unweighted_result = optimizer.minimize(&unweighted_problem, initial_params)?;
+    
+    println!("\nUnweighted fit parameters:");
+    println!("  Slope (m): {:.4}", unweighted_result.params[0]);
+    println!("  Intercept (c): {:.4}", unweighted_result.params[1]);
+    println!("Cost: {:.6}", unweighted_result.cost);
+    
+    println!("\nTrue parameters: m=2.0, c=1.0");
+    
+    Ok(())
+}
+```
+
+These examples demonstrate the versatility and power of `lmopt-rs` for various fitting applications. For more advanced usage, see the [Composite Models](./composite_models.md) and [Global Optimization](./global_optimization.md) examples.

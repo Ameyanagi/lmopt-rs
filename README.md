@@ -1,11 +1,14 @@
 # lmopt-rs
 
-A Rust implementation of the Levenberg-Marquardt algorithm for nonlinear least-squares optimization, with comprehensive uncertainty calculation capabilities.
+A Rust implementation of the Levenberg-Marquardt algorithm for nonlinear least-squares optimization, with comprehensive uncertainty calculation capabilities inspired by Python's lmfit-py.
 
 [![Crate](https://img.shields.io/crates/v/lmopt-rs.svg)](https://crates.io/crates/lmopt-rs)
 [![Documentation](https://docs.rs/lmopt-rs/badge.svg)](https://docs.rs/lmopt-rs)
 [![GitHub Pages](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://ameyanagi.github.io/lmopt-rs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/Rust-Nightly-orange)](https://rust-lang.org)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/ameyanagi/lmopt-rs/ci.yml?branch=main)](https://github.com/ameyanagi/lmopt-rs/actions)
+[![codecov](https://codecov.io/gh/ameyanagi/lmopt-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/ameyanagi/lmopt-rs)
 
 ## Features
 
@@ -32,11 +35,45 @@ A Rust implementation of the Levenberg-Marquardt algorithm for nonlinear least-s
 
 ## Installation
 
+### Requirements
+
+This library requires the Rust nightly compiler due to advanced features used in matrix computations and numeric algorithms. A `rust-toolchain.toml` file is included in the repository that will automatically select the nightly compiler when you build the project.
+
+### Basic Installation
+
 Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 lmopt-rs = "0.1.0"
+```
+
+### With Specific Features
+
+To enable specific features, use:
+
+```toml
+[dependencies]
+lmopt-rs = { version = "0.1.0", features = ["lm-compat", "autodiff"] }
+```
+
+### Using git repository
+
+For the latest development version:
+
+```toml
+[dependencies]
+lmopt-rs = { git = "https://github.com/ameyanagi/lmopt-rs", branch = "main" }
+```
+
+### Local Development
+
+Clone the repository:
+
+```bash
+git clone https://github.com/ameyanagi/lmopt-rs.git
+cd lmopt-rs
+cargo build
 ```
 
 ## Basic Usage
@@ -378,22 +415,104 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Documentation
 
-Comprehensive documentation is available at [docs.rs/lmopt-rs](https://docs.rs/lmopt-rs).
+### Online Documentation
 
-## Features
+- API Reference: [docs.rs/lmopt-rs](https://docs.rs/lmopt-rs)
+- User Guide: [GitHub Pages](https://ameyanagi.github.io/lmopt-rs/)
 
-- `matrix`: Enable matrix operations using faer and faer-ext (enabled by default)
-- `lm`: Enable Levenberg-Marquardt implementation (enabled by default)
-- `lm-compat`: Enable compatibility with the levenberg-marquardt crate
-- `autodiff`: Enable experimental autodiff support for derivative calculation
-- `parameters`: Enable just the parameter system
+### Documentation Structure
+
+- [Getting Started](https://docs.rs/lmopt-rs/latest/lmopt_rs/docs/getting_started.md) - Installation and basic usage
+- Concept Guides:
+  - [Parameter System](https://docs.rs/lmopt-rs/latest/lmopt_rs/docs/concepts/parameters.md) - Managing parameters with bounds and constraints
+  - [Model System](https://docs.rs/lmopt-rs/latest/lmopt_rs/docs/concepts/models.md) - Built-in models and custom model creation
+  - [Levenberg-Marquardt Algorithm](https://docs.rs/lmopt-rs/latest/lmopt_rs/docs/concepts/lm_algorithm.md) - Details of the LM implementation
+  - [Uncertainty Analysis](https://docs.rs/lmopt-rs/latest/lmopt_rs/docs/concepts/uncertainty.md) - Confidence intervals and error propagation
+  - [Global Optimization](https://docs.rs/lmopt-rs/latest/lmopt_rs/docs/concepts/global_optimization.md) - Methods for finding global minima
+- Examples:
+  - [Basic Fitting](https://docs.rs/lmopt-rs/latest/lmopt_rs/docs/examples/basic_fitting.md) - Simple fitting examples
+
+### Local Documentation
+
+To build the documentation locally:
+
+```bash
+cargo doc --open
+```
+
+## Feature Flags
+
+This crate provides the following feature flags to customize functionality:
+
+| Feature Flag | Description | Default |
+|-------------|-------------|---------|
+| `matrix` | Matrix operations using faer and faer-ext | ✅ Enabled |
+| `lm` | Core Levenberg-Marquardt implementation | ✅ Enabled |
+| `lm-compat` | Compatibility layer with the levenberg-marquardt crate | ❌ Disabled |
+| `autodiff` | Experimental autodiff support using Rust nightly features | ❌ Disabled |
+| `parameters` | Parameter system only (without LM algorithm) | ❌ Disabled |
+
+### Combining Feature Flags
+
+Features can be combined as needed:
+
+```toml
+# For compatibility with levenberg-marquardt crate
+lmopt-rs = { version = "0.1.0", features = ["lm-compat"] }
+
+# For experimental autodiff support
+lmopt-rs = { version = "0.1.0", features = ["autodiff"] }
+
+# For just the parameter system without optimization
+lmopt-rs = { version = "0.1.0", features = ["parameters"], default-features = false }
+```
+
+## Comparison with Other Libraries
+
+### vs. levenberg-marquardt
+
+The [levenberg-marquardt](https://crates.io/crates/levenberg-marquardt) crate provides a basic implementation of the Levenberg-Marquardt algorithm. lmopt-rs expands upon this with:
+
+- A more robust parameter system with named parameters
+- Comprehensive uncertainty analysis
+- Built-in model system
+- Global optimization capabilities
+
+### vs. lmfit-py
+
+[lmfit-py](https://lmfit.github.io/lmfit-py/) is a popular Python library for nonlinear optimization with uncertainty analysis. lmopt-rs brings similar concepts to Rust:
+
+- Parameter system with bounds and constraints
+- Built-in models and composite models
+- Uncertainty analysis and confidence intervals
+- Pure Rust implementation with no Python dependencies
+
+### vs. Other Optimization Libraries
+
+Compared to general optimization libraries, lmopt-rs offers:
+
+- Specialized focus on nonlinear least-squares problems
+- Built-in uncertainty analysis
+- Parameter constraints and expressions
+- High-performance matrix operations with faer
 
 ## References and Compatibility
 
-- Compatible with the [levenberg-marquardt](https://crates.io/crates/levenberg-marquardt) crate
-- Inspired by [lmfit-py](https://lmfit.github.io/lmfit-py/) for uncertainty calculations
+- API compatibility with the [levenberg-marquardt](https://crates.io/crates/levenberg-marquardt) crate
+- Inspired by [lmfit-py](https://lmfit.github.io/lmfit-py/) for uncertainty calculations and parameter handling
 - Uses [faer](https://docs.rs/faer/latest/faer/) for high-performance matrix operations
+- Incorporates algorithms from [Numerical Recipes](http://numerical.recipes/) and [MINPACK](https://www.netlib.org/minpack/)
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

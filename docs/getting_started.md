@@ -121,10 +121,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Next Steps
 
-- Learn more about the [Parameter System](./concepts/parameters.md)
-- Explore the [Model System](./concepts/models.md)
-- Understand [Uncertainty Analysis](./concepts/uncertainty.md)
-- Try [Global Optimization](./concepts/global_optimization.md)
-- Check examples in the [examples directory](../examples/)
+- **Core Concepts**:
+  - [Parameter System](./concepts/parameters.md) - Working with named parameters, bounds, and constraints
+  - [Model System](./concepts/models.md) - Using built-in models and creating custom models
+  - [Levenberg-Marquardt Algorithm](./concepts/lm_algorithm.md) - Details of the optimization algorithm
+  - [Uncertainty Analysis](./concepts/uncertainty.md) - Calculating confidence intervals and errors
+  - [Global Optimization](./concepts/global_optimization.md) - Finding global minima with multiple methods
+  - [Automatic Differentiation](./concepts/autodiff.md) - Using autodiff for calculating derivatives
+
+- **Examples**:
+  - [Basic Fitting](./examples/basic_fitting.md) - Simple curve fitting examples
+  - [Composite Models](./examples/composite_models.md) - Combining multiple models
+  - [Global Optimization](./examples/global_optimization.md) - Advanced global optimization
+
+- **Other Resources**:
+  - [Comparison with Other Libraries](../comparison.md) - How `lmopt-rs` compares to alternatives
+  - [API Reference](https://docs.rs/lmopt-rs) - Detailed API documentation
 
 For more detailed information, refer to the [API documentation](https://docs.rs/lmopt-rs).

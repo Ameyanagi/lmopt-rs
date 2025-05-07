@@ -19,6 +19,10 @@ pub enum LmOptError {
     #[error("Algorithm failed to converge: {0}")]
     ConvergenceFailure(String),
 
+    /// Error indicating optimization failed.
+    #[error("Optimization failed: {0}")]
+    OptimizationFailure(String),
+
     /// Error for invalid parameter values.
     #[error("Invalid parameter value: {0}")]
     InvalidParameter(String),
@@ -50,6 +54,18 @@ pub enum LmOptError {
     /// Invalid input data.
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+
+    /// Invalid state in the algorithm or data structure.
+    #[error("Invalid state: {0}")]
+    InvalidState(String),
+
+    /// Parameter not found.
+    #[error("Parameter not found: {0}")]
+    ParameterNotFound(String),
+
+    /// Linear algebra error.
+    #[error("Linear algebra error: {0}")]
+    LinearAlgebraError(String),
 
     /// I/O error wrapper.
     #[error("IO error: {0}")]

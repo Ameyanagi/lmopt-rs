@@ -152,7 +152,7 @@ impl HybridGlobal {
         }
 
         // Otherwise, run local optimization to refine the solution
-        let local_optimizer = LevenbergMarquardt::new(self.local_config.clone());
+        let local_optimizer = LevenbergMarquardt::with_config(self.local_config.clone());
         let local_result = local_optimizer.minimize(problem, global_result.params.clone())?;
 
         // Check if local optimization improved the solution

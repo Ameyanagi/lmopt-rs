@@ -2,6 +2,15 @@
 
 The model system in `lmopt-rs` provides a flexible framework for defining and fitting mathematical models to data. It's inspired by the model handling in lmfit-py and offers an intuitive way to create, combine, and fit various types of models.
 
+## Related Documentation
+- [Getting Started Guide](../getting_started.md)
+- [Parameter System](./parameters.md) - Used by models for parameter management
+- [Levenberg-Marquardt Algorithm](./lm_algorithm.md) - Used for fitting models
+- [Uncertainty Analysis](./uncertainty.md) - Calculate uncertainty for fitted models
+- [Basic Fitting Examples](../examples/basic_fitting.md)
+- [Composite Models Examples](../examples/composite_models.md)
+- [Comparison with lmfit-py](../comparison.md)
+
 ## Core Concepts
 
 The model system is built around these key components:

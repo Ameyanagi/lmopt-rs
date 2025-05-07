@@ -16,12 +16,11 @@ mod polynomial;
 mod step;
 
 // Re-export the models
-// These models are not yet implemented
-//pub use peak::{GaussianModel, LorentzianModel, VoigtModel, PseudoVoigtModel};
 pub use composite::{add, composite_with_shared_params, multiply, CompositeModel, Operation};
 pub use exponential::{ExponentialModel, PowerLawModel};
+pub use peak::{GaussianModel, LorentzianModel, PseudoVoigtModel};
 pub use polynomial::{ConstantModel, LinearModel, PolynomialModel, QuadraticModel};
-pub use step::{RectangleModel, SigmoidModel, StepModel};
+pub use step::{LinearStepModel, SigmoidModel};
 
 /// Create a linear model with the specified parameter names
 ///
@@ -34,7 +33,7 @@ pub use step::{RectangleModel, SigmoidModel, StepModel};
 ///
 /// * A linear model (y = m*x + b)
 pub fn linear_model(prefix: &str, with_init: bool) -> LinearModel {
-    LinearModel::new(prefix, with_init)
+    LinearModel::new(prefix, 1, with_init)
 }
 
 /// Create a quadratic model with the specified parameter names
@@ -48,23 +47,21 @@ pub fn linear_model(prefix: &str, with_init: bool) -> LinearModel {
 ///
 /// * A quadratic model (y = a*x^2 + b*x + c)
 pub fn quadratic_model(prefix: &str, with_init: bool) -> QuadraticModel {
-    QuadraticModel::new(prefix, with_init)
+    QuadraticModel::new(prefix, 2, with_init)
 }
 
-// These models are not yet implemented
-/*
 /// Create a Gaussian peak model
 ///
 /// # Arguments
 ///
 /// * `prefix` - The prefix for parameter names
-/// * `with_init` - Whether to initialize parameters with reasonable values based on data
+/// * `with_baseline` - Whether to include a baseline parameter
 ///
 /// # Returns
 ///
 /// * A Gaussian model (y = amplitude * exp(-(x-center)^2 / (2*sigma^2)) + baseline)
-pub fn gaussian_model(prefix: &str, with_init: bool) -> GaussianModel {
-    GaussianModel::new(prefix, with_init)
+pub fn gaussian_model(prefix: &str, with_baseline: bool) -> GaussianModel {
+    GaussianModel::new(prefix, with_baseline)
 }
 
 /// Create a Lorentzian peak model
@@ -72,15 +69,28 @@ pub fn gaussian_model(prefix: &str, with_init: bool) -> GaussianModel {
 /// # Arguments
 ///
 /// * `prefix` - The prefix for parameter names
-/// * `with_init` - Whether to initialize parameters with reasonable values based on data
+/// * `with_baseline` - Whether to include a baseline parameter
 ///
 /// # Returns
 ///
 /// * A Lorentzian model (y = amplitude * gamma^2 / ((x-center)^2 + gamma^2) + baseline)
-pub fn lorentzian_model(prefix: &str, with_init: bool) -> LorentzianModel {
-    LorentzianModel::new(prefix, with_init)
+pub fn lorentzian_model(prefix: &str, with_baseline: bool) -> LorentzianModel {
+    LorentzianModel::new(prefix, with_baseline)
 }
-*/
+
+/// Create a PseudoVoigt peak model
+///
+/// # Arguments
+///
+/// * `prefix` - The prefix for parameter names
+/// * `with_baseline` - Whether to include a baseline parameter
+///
+/// # Returns
+///
+/// * A PseudoVoigt model (weighted sum of Gaussian and Lorentzian)
+pub fn pseudovoigt_model(prefix: &str, with_baseline: bool) -> PseudoVoigtModel {
+    PseudoVoigtModel::new(prefix, with_baseline)
+}
 
 /// Create an exponential model
 ///
@@ -125,18 +135,18 @@ pub fn polynomial_model(prefix: &str, degree: usize, with_init: bool) -> Polynom
     PolynomialModel::new(prefix, degree, with_init)
 }
 
-/// Create a step model
+/// Create a linear step model
 ///
 /// # Arguments
 ///
 /// * `prefix` - The prefix for parameter names
-/// * `with_init` - Whether to initialize parameters with reasonable values based on data
+/// * `with_baseline` - Whether to include a baseline parameter
 ///
 /// # Returns
 ///
-/// * A step model (y = amplitude * (x > center) + baseline)
-pub fn step_model(prefix: &str, with_init: bool) -> StepModel {
-    StepModel::new(prefix, with_init)
+/// * A linear step model (y = amplitude * (x-center)/abs(x-center)+sigma) + baseline)
+pub fn linear_step_model(prefix: &str, with_baseline: bool) -> LinearStepModel {
+    LinearStepModel::new(prefix, with_baseline)
 }
 
 /// Create a sigmoid model
@@ -144,27 +154,15 @@ pub fn step_model(prefix: &str, with_init: bool) -> StepModel {
 /// # Arguments
 ///
 /// * `prefix` - The prefix for parameter names
-/// * `with_init` - Whether to initialize parameters with reasonable values based on data
+/// * `with_baseline` - Whether to include a baseline parameter
 ///
 /// # Returns
 ///
 /// * A sigmoid model (y = amplitude / (1 + exp(-(x-center)/sigma)) + baseline)
-pub fn sigmoid_model(prefix: &str, with_init: bool) -> SigmoidModel {
-    SigmoidModel::new(prefix, with_init)
+pub fn sigmoid_model(prefix: &str, with_baseline: bool) -> SigmoidModel {
+    SigmoidModel::new(prefix, with_baseline)
 }
 
-/// Create a rectangle model
-///
-/// # Arguments
-///
-/// * `prefix` - The prefix for parameter names
-/// * `with_init` - Whether to initialize parameters with reasonable values based on data
-///
-/// # Returns
-///
-/// * A rectangle model (y = amplitude * (x > center1 && x < center2) + baseline)
-pub fn rectangle_model(prefix: &str, with_init: bool) -> RectangleModel {
-    RectangleModel::new(prefix, with_init)
-}
+// Rectangle model is not implemented yet
 
 // Composite models - placeholder for future implementation

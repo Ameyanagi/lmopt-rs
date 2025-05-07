@@ -2,6 +2,14 @@
 
 Nonlinear least-squares problems often have multiple local minima, making it challenging to find the global optimum. The `lmopt-rs` library provides several global optimization methods to address this challenge.
 
+## Related Documentation
+- [Getting Started Guide](../getting_started.md)
+- [Parameter System](./parameters.md) - Parameter management for optimization
+- [Model System](./models.md) - Models that can be globally optimized
+- [Levenberg-Marquardt Algorithm](./lm_algorithm.md) - Local optimization used with global methods
+- [Global Optimization Examples](../examples/global_optimization.md)
+- [Comparison with Other Libraries](../comparison.md)
+
 ## Core Global Optimization Concepts
 
 The global optimization methods in `lmopt-rs` use different strategies to search the parameter space and locate the global minimum:

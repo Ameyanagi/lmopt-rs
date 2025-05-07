@@ -1,58 +1,92 @@
-//! # Global Optimization Methods
+//! # Global Optimization
 //!
-//! This module provides global optimization algorithms for finding global minima
-//! of complex objective functions with multiple local minima. These methods overcome
-//! the limitations of local optimization techniques like Levenberg-Marquardt by
-//! exploring the parameter space more thoroughly.
+//! This module provides methods for global optimization to find the global minimum
+//! of nonlinear problems with multiple local minima. It offers several powerful
+//! algorithms and a unified interface for solving complex optimization challenges.
 //!
-//! ## Available Algorithms
+//! ## Key Features
 //!
-//! * **Simulated Annealing**: Mimics the annealing process in metallurgy, randomly
-//!   exploring the parameter space with a temperature parameter that decreases over time.
+//! - **Multiple Algorithms**: Several complementary approaches for different problems
+//! - **Parameter Bounds**: Support for box constraints on parameters
+//! - **Unified Interface**: Common API for all optimization methods
+//! - **Integration with Parameters**: Works with the parameter system for named parameters
+//! - **Hybrid Methods**: Combines global exploration with local refinement
 //!
-//! * **Differential Evolution**: Population-based evolutionary algorithm that uses
-//!   mutation, crossover, and selection to evolve parameter vectors toward the minimum.
+//! ## Optimization Algorithms
 //!
-//! * **Basin Hopping**: Combines global stepping with local minimization, useful for
-//!   energy landscapes with many local minima separated by barriers.
+//! - **[`SimulatedAnnealing`]**: Mimics the annealing process in metallurgy
+//! - **[`DifferentialEvolution`]**: Population-based evolutionary algorithm
+//! - **[`BasinHopping`]**: Combines random jumps with local optimization
+//! - **[`HybridGlobal`]**: Meta-optimizer that combines multiple approaches
 //!
-//! * **Hybrid Global-Local**: Combines global search with Levenberg-Marquardt local
-//!   optimization for efficient and robust minimization.
+//! ## Example Usage
 //!
-//! ## Usage Examples
+//! ```rust
+//! use lmopt_rs::{optimize_global, Problem};
+//! use ndarray::{array, Array1};
 //!
-//! ```rust,no_run
-//! use lmopt_rs::{SimulatedAnnealing, GlobalOptimizer, problem::Problem};
-//! use ndarray::Array1;
+//! // Define a problem with multiple local minima
+//! struct MultiWellProblem;
 //!
-//! // Create your problem (implementing the Problem trait)
-//! let problem = /* your problem */;
+//! impl Problem for MultiWellProblem {
+//!     fn eval(&self, params: &Array1<f64>) -> lmopt_rs::Result<Array1<f64>> {
+//!         let x = params[0];
+//!         let y = params[1];
+//!         
+//!         // Rastrigin function: has multiple local minima
+//!         // f(x, y) = 20 + x^2 + y^2 - 10(cos(2πx) + cos(2πy))
+//!         let term1 = 20.0 + x.powi(2) + y.powi(2);
+//!         let term2 = 10.0 * ((2.0 * std::f64::consts::PI * x).cos() +
+//!                            (2.0 * std::f64::consts::PI * y).cos());
+//!         let value = term1 - term2;
+//!         
+//!         Ok(array![value.sqrt()])
+//!     }
+//!     
+//!     fn parameter_count(&self) -> usize { 2 }
+//!     
+//!     fn residual_count(&self) -> usize { 1 }
+//! }
 //!
-//! // Define parameter bounds (min, max) for each parameter
-//! let bounds = vec![(0.0, 10.0), (-5.0, 5.0)];
+//! // Create the problem
+//! let problem = MultiWellProblem;
 //!
-//! // Create a global optimizer (e.g., simulated annealing)
-//! let mut optimizer = SimulatedAnnealing::new();
+//! // Define bounds for the parameters
+//! let bounds = vec![(-5.0, 5.0), (-5.0, 5.0)];
 //!
-//! // Run the optimization
-//! let result = optimizer.optimize(&problem, &bounds, 1000, 100, 1e-8).unwrap();
+//! // Run global optimization
+//! let result = optimize_global(
+//!     &problem,    // Problem to solve
+//!     &bounds,     // Parameter bounds
+//!     100,         // Number of iterations
+//!     20,          // Population size
+//!     1e-6         // Tolerance
+//! ).unwrap();
 //!
-//! // Use the results
-//! println!("Optimal parameters: {:?}", result.params);
-//! println!("Final cost: {}", result.cost);
+//! println!("Global minimum found at: ({:.3}, {:.3})",
+//!          result.params[0], result.params[1]);
+//! println!("Function value: {:.6}", result.cost);
 //! ```
 //!
-//! For parameter-based problems:
+//! ## Using Specific Algorithms
 //!
-//! ```rust,no_run
-//! use lmopt_rs::{optimize_global_param_problem, problem_params::ParameterProblem};
+//! ```rust
+//! use lmopt_rs::{GlobalOptimizer, DifferentialEvolution, BasinHopping};
 //!
-//! // Create a problem implementing ParameterProblem trait
-//! let mut param_problem = /* your parameter problem */;
+//! // Differential Evolution
+//! let de = DifferentialEvolution::new()
+//!     .with_crossover_probability(0.7)
+//!     .with_differential_weight(0.8);
+//! let de_result = de.optimize(&problem, &bounds, 100, 30, 1e-6).unwrap();
 //!
-//! // Optimize using the default global optimizer (HybridGlobal)
-//! let result = optimize_global_param_problem(&mut param_problem, 1000, 100, 1e-8).unwrap();
+//! // Basin Hopping
+//! let bh = BasinHopping::new()
+//!     .with_step_size(1.0)
+//!     .with_temperature(1.0);
+//! let bh_result = bh.optimize(&problem, &bounds, 50, 10, 1e-6).unwrap();
 //! ```
+//!
+//! For comprehensive documentation, see the [Global Optimization guide](https://docs.rs/lmopt-rs/latest/lmopt_rs/docs/concepts/global_optimization.md).
 
 use ndarray::{Array1, Array2};
 use rand::Rng;
@@ -309,12 +343,18 @@ impl fmt::Display for GlobalOptResult {
 mod basin_hopping;
 mod differential_evolution;
 mod hybrid;
+mod parallel;
+mod parallel_differential_evolution;
 mod simulated_annealing;
 
 // Re-export optimization algorithms
 pub use basin_hopping::BasinHopping;
 pub use differential_evolution::DifferentialEvolution;
 pub use hybrid::HybridGlobal;
+pub use parallel::{
+    clip_population_parallel, create_population_parallel, evaluate_population_parallel,
+};
+pub use parallel_differential_evolution::ParallelDifferentialEvolution;
 pub use simulated_annealing::SimulatedAnnealing;
 
 /// Run global optimization using a hybrid approach combining global and local methods.
@@ -327,10 +367,41 @@ pub use simulated_annealing::SimulatedAnnealing;
 /// # Arguments
 ///
 /// * `problem` - The problem to solve, implementing the `Problem` trait
-/// * `initial_params` - Initial guess for the parameters
 /// * `bounds` - Lower and upper bounds for each parameter as Vec of (min, max) tuples
-/// * `max_iterations` - Maximum number of iterations for global optimization
-/// * `max_no_improvement` - Maximum number of iterations without improvement before stopping
+/// * `iterations` - Maximum number of iterations for global optimization
+/// * `population_size` - Population size (for population-based methods)
+/// * `tol` - Tolerance for convergence
+///
+/// # Returns
+///
+/// * `Result<GlobalOptResult>` - The best solution found and its cost, or an error
+pub fn optimize_global<P: Problem>(
+    problem: &P,
+    bounds: &[(f64, f64)],
+    iterations: usize,
+    population_size: usize,
+    tol: f64,
+) -> Result<GlobalOptResult> {
+    // Create a hybrid optimizer
+    let optimizer = HybridGlobal::new();
+
+    // Run the optimization
+    optimizer.optimize(problem, bounds, iterations, population_size, tol)
+}
+
+/// Run global optimization in parallel, using a hybrid approach combining global and local methods.
+///
+/// This function provides a parallel implementation of global optimization, which
+/// can significantly speed up the optimization process for computationally
+/// expensive problems. It uses `ParallelDifferentialEvolution` as the global
+/// optimizer and `ParallelLevenbergMarquardt` for local refinement.
+///
+/// # Arguments
+///
+/// * `problem` - The problem to solve, implementing the `Problem` trait
+/// * `bounds` - Lower and upper bounds for each parameter as Vec of (min, max) tuples
+/// * `iterations` - Maximum number of iterations for global optimization
+/// * `population_size` - Population size (for population-based methods)
 /// * `tol` - Tolerance for convergence
 ///
 /// # Returns
@@ -340,51 +411,46 @@ pub use simulated_annealing::SimulatedAnnealing;
 /// # Example
 ///
 /// ```rust,no_run
-/// use lmopt_rs::optimize_global;
-/// use lmopt_rs::problem::Problem;
+/// use lmopt_rs::{optimize_global_parallel, Problem};
 /// use ndarray::Array1;
 ///
-/// // Your problem implementation
-/// struct MyProblem { /* ... */ }
-/// impl Problem for MyProblem { /* ... */ }
+/// struct MyProblem;
+/// impl Problem for MyProblem {
+///    // Problem implementation...
+///    # fn eval(&self, params: &Array1<f64>) -> lmopt_rs::Result<Array1<f64>> { Ok(Array1::zeros(1)) }
+///    # fn parameter_count(&self) -> usize { 1 }
+///    # fn residual_count(&self) -> usize { 1 }
+/// }
 ///
-/// let problem = MyProblem { /* ... */ };
-/// let initial_params = Array1::from_vec(vec![0.0, 0.0]);
-/// let bounds = vec![(-10.0, 10.0), (-10.0, 10.0)];
+/// let problem = MyProblem;
+/// let bounds = vec![(-10.0, 10.0)];
 ///
-/// // Run the optimization
-/// let result = optimize_global(
-///     &problem,
-///     &initial_params,
-///     &bounds,
-///     1000,   // max iterations
-///     100,    // max no improvement
-///     1e-6    // tolerance
+/// // Run parallel global optimization
+/// let result = optimize_global_parallel(
+///     &problem,    // Problem to solve
+///     &bounds,     // Parameter bounds
+///     100,         // Number of iterations
+///     20,          // Population size
+///     1e-6         // Tolerance
 /// ).unwrap();
 ///
-/// println!("Best parameters: {:?}", result.params);
-/// println!("Final cost: {}", result.cost);
+/// println!("Global minimum found at: {:.3}", result.params[0]);
+/// println!("Function value: {:.6}", result.cost);
 /// ```
-pub fn optimize_global<P: Problem>(
+pub fn optimize_global_parallel<P: Problem + Sync>(
     problem: &P,
-    initial_params: &Array1<f64>,
     bounds: &[(f64, f64)],
-    max_iterations: usize,
-    max_no_improvement: usize,
+    iterations: usize,
+    population_size: usize,
     tol: f64,
 ) -> Result<GlobalOptResult> {
-    // Create a hybrid optimizer
-    let optimizer = HybridGlobal::new();
+    // Create a parallel differential evolution optimizer
+    let optimizer = ParallelDifferentialEvolution::new()
+        .with_population_size(population_size)
+        .with_local_optimization(true);
 
     // Run the optimization
-    optimizer.optimize_with_initial(
-        problem,
-        initial_params,
-        bounds,
-        max_iterations,
-        max_no_improvement,
-        tol,
-    )
+    optimizer.optimize(problem, bounds, iterations, population_size, tol)
 }
 
 /// Run global optimization for a parameter-based problem.
@@ -401,71 +467,36 @@ pub fn optimize_global<P: Problem>(
 /// # Arguments
 ///
 /// * `problem` - The parameter problem to solve, implementing `ParameterProblem` trait
-/// * `max_iterations` - Maximum number of iterations for global optimization
-/// * `max_no_improvement` - Maximum number of iterations without improvement
+/// * `iterations` - Maximum number of iterations for global optimization
+/// * `population_size` - Population size (for population-based methods)
 /// * `tol` - Tolerance for convergence
 ///
 /// # Returns
 ///
 /// * `Result<GlobalOptResult>` - The best solution found and its cost, or an error
-///
-/// # Example
-///
-/// ```rust,no_run
-/// use lmopt_rs::{optimize_global_param_problem, parameters::Parameters};
-/// use lmopt_rs::problem_params::ParameterProblem;
-///
-/// // A problem with named parameters
-/// struct MyFittingProblem {
-///     parameters: Parameters,
-///     data_x: Vec<f64>,
-///     data_y: Vec<f64>,
-/// }
-///
-/// // Implement ParameterProblem for your problem
-/// impl ParameterProblem for MyFittingProblem {
-///     // Parameter access methods
-///     fn parameters(&self) -> &Parameters { &self.parameters }
-///     fn parameters_mut(&mut self) -> &mut Parameters { &mut self.parameters }
-///     
-///     // Residual evaluation method
-///     fn eval_with_parameters(&self) -> Result<ndarray::Array1<f64>, lmopt_rs::error::LmOptError> {
-///         // Calculate residuals between model and data
-///         // ...
-///         Ok(residuals)
-///     }
-/// }
-///
-/// // Create and set up problem
-/// let mut problem = MyFittingProblem { /* ... */ };
-///
-/// // Run global optimization
-/// let result = optimize_global_param_problem(
-///     &mut problem,
-///     1000,   // max iterations
-///     100,    // max no improvement
-///     1e-6    // tolerance
-/// ).unwrap();
-///
-/// println!("Optimization succeeded: {}", result.success);
-/// println!("Final cost: {}", result.cost);
-///
-/// // Access optimized parameter values
-/// for (name, param) in problem.parameters().iter() {
-///     println!("{} = {:.6}", name, param.value());
-/// }
-/// ```
 pub fn optimize_global_param_problem<P: ParameterProblem>(
-    _problem: &mut P,
-    max_iterations: usize,
-    max_no_improvement: usize,
+    problem: &mut P,
+    iterations: usize,
+    population_size: usize,
     tol: f64,
 ) -> Result<GlobalOptResult> {
-    // Create a hybrid optimizer
-    let mut optimizer = HybridGlobal::new();
+    // Get bounds from parameters
+    let bounds = HybridGlobal::get_bounds_from_parameters(problem)?;
 
-    // Run the optimization
-    optimizer.optimize_param_problem(max_iterations, max_no_improvement, tol)
+    // Create problem adapter
+    let adapter = crate::problem_params::problem_from_parameter_problem(problem);
+
+    // Get initial parameters
+    let initial_params = problem.parameters_to_array()?;
+
+    // Run global optimization
+    let optimizer = HybridGlobal::new();
+    let result = optimizer.optimize(&adapter, &bounds, iterations, population_size, tol)?;
+
+    // Update parameters with optimized values
+    problem.update_parameters_from_array(&result.params)?;
+
+    Ok(result)
 }
 
 /// Generate a random point within the given bounds.

@@ -7,7 +7,7 @@
 extern crate test;
 
 use lmopt_rs::{
-    lm::{LevenbergMarquardt, LMConfig},
+    lm::{LevenbergMarquardt, LmConfig},
     problem::Problem,
 };
 use ndarray::{Array1, Array2};
@@ -23,7 +23,7 @@ impl LinearModel {
     fn new(x: Array1<f64>, y: Array1<f64>) -> Self {
         Self { x, y }
     }
-    
+
     fn generate(m: f64, b: f64, n: usize) -> Self {
         let x = Array1::linspace(0.0, 10.0, n);
         let y = x.mapv(|x_val| m * x_val + b);
@@ -32,40 +32,39 @@ impl LinearModel {
 }
 
 impl Problem for LinearModel {
-    type Scalar = f64;
-    type Parameters = Array1<f64>;
-    type ResidualVector = Array1<f64>;
-    type JacobianMatrix = Array2<f64>;
-    
-    fn residuals(&self, params: &Self::Parameters) -> Self::ResidualVector {
+    fn eval(&self, params: &Array1<f64>) -> lmopt_rs::Result<Array1<f64>> {
         let m = params[0];
         let b = params[1];
-        
+
         let predicted = self.x.mapv(|x_val| m * x_val + b);
-        &predicted - &self.y
+        Ok(&predicted - &self.y)
     }
-    
-    fn jacobian(&self, _params: &Self::Parameters) -> Self::JacobianMatrix {
+
+    fn jacobian(&self, _params: &Array1<f64>) -> lmopt_rs::Result<Array2<f64>> {
         let n = self.x.len();
         let mut jacobian = Array2::<f64>::zeros((n, 2));
-        
+
         for i in 0..n {
             // ∂f/∂m = x
             jacobian[[i, 0]] = self.x[i];
-            
+
             // ∂f/∂b = 1
             jacobian[[i, 1]] = 1.0;
         }
-        
-        jacobian
+
+        Ok(jacobian)
     }
-    
-    fn num_residuals(&self) -> usize {
+
+    fn residual_count(&self) -> usize {
         self.x.len()
     }
-    
-    fn num_parameters(&self) -> usize {
+
+    fn parameter_count(&self) -> usize {
         2 // m and b
+    }
+
+    fn has_custom_jacobian(&self) -> bool {
+        true
     }
 }
 
@@ -79,7 +78,7 @@ impl ExponentialModel {
     fn new(x: Array1<f64>, y: Array1<f64>) -> Self {
         Self { x, y }
     }
-    
+
     fn generate(a: f64, b: f64, n: usize) -> Self {
         let x = Array1::linspace(0.0, 2.0, n);
         let y = x.mapv(|x_val| a * (b * x_val).exp());
@@ -88,46 +87,45 @@ impl ExponentialModel {
 }
 
 impl Problem for ExponentialModel {
-    type Scalar = f64;
-    type Parameters = Array1<f64>;
-    type ResidualVector = Array1<f64>;
-    type JacobianMatrix = Array2<f64>;
-    
-    fn residuals(&self, params: &Self::Parameters) -> Self::ResidualVector {
+    fn eval(&self, params: &Array1<f64>) -> lmopt_rs::Result<Array1<f64>> {
         let a = params[0];
         let b = params[1];
-        
+
         let predicted = self.x.mapv(|x_val| a * (b * x_val).exp());
-        &predicted - &self.y
+        Ok(&predicted - &self.y)
     }
-    
-    fn jacobian(&self, params: &Self::Parameters) -> Self::JacobianMatrix {
+
+    fn jacobian(&self, params: &Array1<f64>) -> lmopt_rs::Result<Array2<f64>> {
         let a = params[0];
         let b = params[1];
         let n = self.x.len();
-        
+
         let mut jacobian = Array2::<f64>::zeros((n, 2));
-        
+
         for i in 0..n {
             let x_val = self.x[i];
             let exp_term = (b * x_val).exp();
-            
+
             // ∂f/∂a = exp(b * x)
             jacobian[[i, 0]] = exp_term;
-            
+
             // ∂f/∂b = a * x * exp(b * x)
             jacobian[[i, 1]] = a * x_val * exp_term;
         }
-        
-        jacobian
+
+        Ok(jacobian)
     }
-    
-    fn num_residuals(&self) -> usize {
+
+    fn residual_count(&self) -> usize {
         self.x.len()
     }
-    
-    fn num_parameters(&self) -> usize {
+
+    fn parameter_count(&self) -> usize {
         2 // a and b
+    }
+
+    fn has_custom_jacobian(&self) -> bool {
+        true
     }
 }
 
@@ -147,38 +145,34 @@ impl RosenbrockModel {
 }
 
 impl Problem for RosenbrockModel {
-    type Scalar = f64;
-    type Parameters = Array1<f64>;
-    type ResidualVector = Array1<f64>;
-    type JacobianMatrix = Array2<f64>;
-    
-    fn residuals(&self, params: &Self::Parameters) -> Self::ResidualVector {
+    fn eval(&self, params: &Array1<f64>) -> lmopt_rs::Result<Array1<f64>> {
         let x = params[0];
         let y = params[1];
-        
-        Array1::from_vec(vec![
+
+        Ok(Array1::from_vec(vec![
             self.a - x,
-            (self.b).sqrt() * (y - x * x)
-        ])
+            (self.b).sqrt() * (y - x * x),
+        ]))
     }
-    
-    fn jacobian(&self, params: &Self::Parameters) -> Self::JacobianMatrix {
+
+    fn jacobian(&self, params: &Array1<f64>) -> lmopt_rs::Result<Array2<f64>> {
         let x = params[0];
         let _y = params[1];
         let sqrt_b = (self.b).sqrt();
-        
-        Array2::from_shape_vec((2, 2), vec![
-            -1.0, 0.0,
-            -2.0 * sqrt_b * x, sqrt_b
-        ]).unwrap()
+
+        Ok(Array2::from_shape_vec((2, 2), vec![-1.0, 0.0, -2.0 * sqrt_b * x, sqrt_b]).unwrap())
     }
-    
-    fn num_residuals(&self) -> usize {
+
+    fn residual_count(&self) -> usize {
         2
     }
-    
-    fn num_parameters(&self) -> usize {
+
+    fn parameter_count(&self) -> usize {
         2 // x and y
+    }
+
+    fn has_custom_jacobian(&self) -> bool {
+        true
     }
 }
 
@@ -187,17 +181,13 @@ impl Problem for RosenbrockModel {
 fn bench_linear_model_1000(b: &mut Bencher) {
     let model = LinearModel::generate(2.5, -3.0, 1000);
     let initial_params = Array1::from_vec(vec![1.0, 0.0]);
-    
-    let config = LMConfig::default()
-        .max_iterations(100)
-        .parameter_tolerance(1e-8)
-        .function_tolerance(1e-8);
-    
-    let lm = LevenbergMarquardt::new(config);
-    
-    b.iter(|| {
-        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
-    });
+
+    let lm = LevenbergMarquardt::with_default_config()
+        .with_max_iterations(100)
+        .with_xtol(1e-8)
+        .with_ftol(1e-8);
+
+    b.iter(|| test::black_box(lm.minimize(&model, initial_params.clone())));
 }
 
 /// Benchmark exponential model fitting with 1000 data points
@@ -205,17 +195,13 @@ fn bench_linear_model_1000(b: &mut Bencher) {
 fn bench_exponential_model_1000(b: &mut Bencher) {
     let model = ExponentialModel::generate(1.5, 0.5, 1000);
     let initial_params = Array1::from_vec(vec![1.0, 0.1]);
-    
-    let config = LMConfig::default()
-        .max_iterations(100)
-        .parameter_tolerance(1e-8)
-        .function_tolerance(1e-8);
-    
-    let lm = LevenbergMarquardt::new(config);
-    
-    b.iter(|| {
-        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
-    });
+
+    let lm = LevenbergMarquardt::with_default_config()
+        .with_max_iterations(100)
+        .with_xtol(1e-8)
+        .with_ftol(1e-8);
+
+    b.iter(|| test::black_box(lm.minimize(&model, initial_params.clone())));
 }
 
 /// Benchmark Rosenbrock function optimization
@@ -223,17 +209,13 @@ fn bench_exponential_model_1000(b: &mut Bencher) {
 fn bench_rosenbrock(b: &mut Bencher) {
     let model = RosenbrockModel::new(1.0, 100.0);
     let initial_params = Array1::from_vec(vec![-1.2, 1.0]);
-    
-    let config = LMConfig::default()
-        .max_iterations(100)
-        .parameter_tolerance(1e-8)
-        .function_tolerance(1e-8);
-    
-    let lm = LevenbergMarquardt::new(config);
-    
-    b.iter(|| {
-        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
-    });
+
+    let lm = LevenbergMarquardt::with_default_config()
+        .with_max_iterations(100)
+        .with_xtol(1e-8)
+        .with_ftol(1e-8);
+
+    b.iter(|| test::black_box(lm.minimize(&model, initial_params.clone())));
 }
 
 /// Benchmark linear model with varying number of data points
@@ -241,37 +223,28 @@ fn bench_rosenbrock(b: &mut Bencher) {
 fn bench_linear_model_10(b: &mut Bencher) {
     let model = LinearModel::generate(2.5, -3.0, 10);
     let initial_params = Array1::from_vec(vec![1.0, 0.0]);
-    
-    let config = LMConfig::default().max_iterations(100);
-    let lm = LevenbergMarquardt::new(config);
-    
-    b.iter(|| {
-        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
-    });
+
+    let lm = LevenbergMarquardt::with_default_config().with_max_iterations(100);
+
+    b.iter(|| test::black_box(lm.minimize(&model, initial_params.clone())));
 }
 
 #[bench]
 fn bench_linear_model_100(b: &mut Bencher) {
     let model = LinearModel::generate(2.5, -3.0, 100);
     let initial_params = Array1::from_vec(vec![1.0, 0.0]);
-    
-    let config = LMConfig::default().max_iterations(100);
-    let lm = LevenbergMarquardt::new(config);
-    
-    b.iter(|| {
-        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
-    });
+
+    let lm = LevenbergMarquardt::with_default_config().with_max_iterations(100);
+
+    b.iter(|| test::black_box(lm.minimize(&model, initial_params.clone())));
 }
 
 #[bench]
 fn bench_linear_model_10000(b: &mut Bencher) {
     let model = LinearModel::generate(2.5, -3.0, 10000);
     let initial_params = Array1::from_vec(vec![1.0, 0.0]);
-    
-    let config = LMConfig::default().max_iterations(100);
-    let lm = LevenbergMarquardt::new(config);
-    
-    b.iter(|| {
-        test::black_box(lm.minimize(test::black_box(lm.minimize(&model, &initial_params))model, initial_params.clone()))
-    });
+
+    let lm = LevenbergMarquardt::with_default_config().with_max_iterations(100);
+
+    b.iter(|| test::black_box(lm.minimize(&model, initial_params.clone())));
 }

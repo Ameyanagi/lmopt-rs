@@ -70,8 +70,8 @@ impl ConstraintType {
             Self::NotEqual => value.abs() >= 1e-10, // lhs ≠ rhs
             Self::LessThan => value < 0.0,      // lhs < rhs -> (lhs - rhs) < 0
             Self::LessThanOrEqual => value <= 0.0, // lhs ≤ rhs -> (lhs - rhs) <= 0
-            Self::GreaterThan => value > 0.0,   // lhs > rhs -> (lhs - rhs) > 0
-            Self::GreaterThanOrEqual => value >= 0.0, // lhs ≥ rhs -> (lhs - rhs) >= 0
+            Self::GreaterThan => value < 0.0,   // lhs > rhs -> (rhs - lhs) < 0
+            Self::GreaterThanOrEqual => value <= 0.0, // lhs ≥ rhs -> (rhs - lhs) <= 0
         }
     }
 }
@@ -126,11 +126,12 @@ impl Constraint {
             ConstraintType::LessThan => format!("({lhs}) - ({rhs})"),
             ConstraintType::LessThanOrEqual => format!("({lhs}) - ({rhs})"),
 
-            // For GreaterThan and GreaterThanOrEqual, we want lhs - rhs > 0 or lhs - rhs ≥ 0
-            // Since our constraint is satisfied when the value matches the constraint type condition,
-            // we need to make sure the expression gives a positive value when lhs > rhs
-            ConstraintType::GreaterThan => format!("({lhs}) - ({rhs})"),
-            ConstraintType::GreaterThanOrEqual => format!("({lhs}) - ({rhs})"),
+            // For GreaterThan and GreaterThanOrEqual, we need to swap the order to rhs - lhs
+            // This makes constraint satisfaction logic work correctly:
+            // - lhs > rhs  is satisfied when (rhs - lhs) < 0
+            // - lhs >= rhs is satisfied when (rhs - lhs) <= 0
+            ConstraintType::GreaterThan => format!("({rhs}) - ({lhs})"),
+            ConstraintType::GreaterThanOrEqual => format!("({rhs}) - ({lhs})"),
         };
 
         // Parse the combined expression

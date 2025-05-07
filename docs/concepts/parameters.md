@@ -1,6 +1,17 @@
 # Parameter System
 
-The `lmopt-rs` parameter system provides a flexible way to manage parameters in optimization problems, similar to the parameter handling in lmfit-py. This system allows you to:
+The `lmopt-rs` parameter system provides a flexible way to manage parameters in optimization problems, similar to the parameter handling in lmfit-py. 
+
+## Related Documentation
+- [Getting Started Guide](../getting_started.md)
+- [Model System](./models.md) - Uses the parameter system
+- [Automatic Differentiation](./autodiff.md) - Works with the parameter system
+- [Basic Fitting Examples](../examples/basic_fitting.md)
+- [Comparison with lmfit-py](../comparison.md)
+
+## Overview
+
+This system allows you to:
 
 - Set bounds (min/max constraints)
 - Create algebraic constraints between parameters

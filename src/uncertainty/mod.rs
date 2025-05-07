@@ -1,15 +1,80 @@
-//! # Uncertainty Calculation
+//! # Uncertainty Analysis
 //!
-//! This module provides functionality for calculating uncertainties in parameter
-//! estimates from nonlinear least-squares optimization results. It includes:
+//! This module provides comprehensive uncertainty quantification for nonlinear least-squares fits,
+//! similar to the capabilities in lmfit-py. It allows you to estimate confidence intervals, calculate
+//! standard errors, and perform Monte Carlo simulations for uncertainty propagation.
 //!
-//! - Covariance matrix estimation from Jacobian matrices
-//! - Confidence interval calculation for parameters
-//! - Standard error calculation for parameter estimates
-//! - F-test for comparing fits with different parameters fixed
+//! ## Key Features
 //!
-//! The implementation approach is similar to that of lmfit-py, providing
-//! robust uncertainty quantification tools for fitted parameters.
+//! - **Covariance Matrix Calculation**: Estimate parameter uncertainties from the Jacobian
+//! - **Standard Error Estimation**: Calculate standard errors for fitted parameters
+//! - **Confidence Intervals**: Determine confidence intervals at different probability levels
+//! - **Monte Carlo Methods**: Perform Monte Carlo simulations for robust uncertainty propagation
+//! - **F-test Comparisons**: Compare different models using statistical F-tests
+//! - **2D Confidence Regions**: Visualize confidence regions for pairs of parameters
+//!
+//! ## Example Usage
+//!
+//! ### Basic Uncertainty Analysis
+//!
+//! ```rust
+//! use lmopt_rs::{uncertainty_analysis, Model};
+//! use lmopt_rs::model::fit;
+//! use lmopt_rs::models::GaussianModel;
+//! use ndarray::Array1;
+//!
+//! // Fit a model to data
+//! let mut model = GaussianModel::new("", true);
+//! let x = Array1::linspace(-5.0, 5.0, 100);
+//! let y = x.mapv(|x_val| 3.0 * (-x_val.powi(2) / 2.0).exp() + 0.5);
+//! let fit_result = fit(&mut model, x.clone(), y.clone()).unwrap();
+//!
+//! // Calculate confidence intervals (1-sigma and 2-sigma)
+//! let uncertainty = uncertainty_analysis(&model, &fit_result).unwrap();
+//!
+//! // Access results
+//! for (name, interval) in &uncertainty.confidence_intervals {
+//!     println!("Parameter: {}", name);
+//!     println!("  Value: {:.4}", interval.value);
+//!     println!("  Error (1-sigma): {:.4}", interval.error);
+//!     println!("  95% CI: [{:.4}, {:.4}]", interval.lower, interval.upper);
+//! }
+//! ```
+//!
+//! ### Monte Carlo Uncertainty Analysis
+//!
+//! ```rust
+//! use lmopt_rs::{uncertainty_analysis_with_monte_carlo, Model};
+//! use lmopt_rs::model::fit;
+//! use lmopt_rs::models::GaussianModel;
+//! use ndarray::Array1;
+//! use rand::SeedableRng;
+//! use rand_chacha::ChaCha8Rng;
+//!
+//! // Fit a model to data
+//! let mut model = GaussianModel::new("", true);
+//! let x = Array1::linspace(-5.0, 5.0, 100);
+//! let y = x.mapv(|x_val| 3.0 * (-x_val.powi(2) / 2.0).exp() + 0.5);
+//! let fit_result = fit(&mut model, x.clone(), y.clone()).unwrap();
+//!
+//! // Set up an RNG for Monte Carlo simulation
+//! let mut rng = ChaCha8Rng::seed_from_u64(42);
+//!
+//! // Perform Monte Carlo analysis with 1000 samples
+//! let monte_carlo = uncertainty_analysis_with_monte_carlo(
+//!     &model, &fit_result, 1000, &mut rng
+//! ).unwrap();
+//!
+//! // Access Monte Carlo results
+//! for (name, dist) in &monte_carlo.parameter_distributions {
+//!     println!("Parameter: {}", name);
+//!     println!("  Mean: {:.4}", dist.mean());
+//!     println!("  Std Dev: {:.4}", dist.std_dev());
+//!     println!("  95% CI: [{:.4}, {:.4}]", dist.percentile(2.5), dist.percentile(97.5));
+//! }
+//! ```
+//!
+//! For comprehensive documentation, see the [Uncertainty Analysis guide](https://docs.rs/lmopt-rs/latest/lmopt_rs/docs/concepts/uncertainty.md).
 
 pub mod confidence;
 pub mod covariance;
